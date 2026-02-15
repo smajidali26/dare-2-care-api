@@ -1,0 +1,239 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String    @map("password_hash")
+  fullName     String    @map("full_name")
+  role         Role      @default(ADMIN)
+  isActive     Boolean   @default(true) @map("is_active")
+  lastLoginAt  DateTime? @map("last_login_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  isDeleted    Boolean   @default(false) @map("is_deleted")
+
+  @@map("users")
+}
+
+model Subscriber {
+  id                    String            @id @default(uuid())
+  fullName              String            @map("full_name")
+  email                 String            @unique
+  phoneNumber           String            @map("phone_number")
+  monthlyDonationAmount Decimal           @map("monthly_donation_amount") @db.Decimal(10, 2)
+  paymentDayOfMonth     Int               @default(1) @map("payment_day_of_month")
+  emailNotifications    Boolean           @default(true) @map("email_notifications")
+  smsNotifications      Boolean           @default(true) @map("sms_notifications")
+  isActive              Boolean           @default(true) @map("is_active")
+  subscriptionStartDate DateTime          @default(now()) @map("subscription_start_date")
+  subscriptionEndDate   DateTime?         @map("subscription_end_date")
+  isManagement          Boolean           @default(false) @map("is_management")
+  managementRole        String?           @map("management_role")
+  managementBio         String?           @map("management_bio") @db.Text
+  subscriberType        SubscriberType    @default(GENERAL) @map("subscriber_type")
+  paymentType           PaymentType       @default(DONATION) @map("payment_type")
+  profileImageUrl       String?           @map("profile_image_url")
+  displayOrder          Int               @default(0) @map("display_order")
+  createdAt             DateTime          @default(now()) @map("created_at")
+  updatedAt             DateTime          @updatedAt @map("updated_at")
+  isDeleted             Boolean           @default(false) @map("is_deleted")
+  notificationLogs      NotificationLog[]
+
+  @@map("subscribers")
+}
+
+model Student {
+  id             String   @id @default(uuid())
+  fullName       String   @map("full_name")
+  dateOfBirth    DateTime @map("date_of_birth")
+  gender         String
+  guardianName   String   @map("guardian_name")
+  guardianPhone  String   @map("guardian_phone")
+  guardianEmail  String?  @map("guardian_email")
+  schoolName     String   @map("school_name")
+  grade          String
+  enrollmentDate DateTime @default(now()) @map("enrollment_date")
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+  isDeleted      Boolean  @default(false) @map("is_deleted")
+
+  @@map("students")
+}
+
+model Teacher {
+  id            String   @id @default(uuid())
+  fullName      String   @map("full_name")
+  email         String   @unique
+  phoneNumber   String   @map("phone_number")
+  subject       String
+  qualification String
+  experience    Int
+  hireDate      DateTime @default(now()) @map("hire_date")
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  isDeleted     Boolean  @default(false) @map("is_deleted")
+
+  @@map("teachers")
+}
+
+model Event {
+  id              String       @id @default(uuid())
+  title           String
+  slug            String       @unique
+  description     String
+  content         String
+  eventDate       DateTime     @map("event_date")
+  location        String
+  metaDescription String?      @map("meta_description") @db.VarChar(160)
+  isPublished     Boolean      @default(false) @map("is_published")
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+  isDeleted       Boolean      @default(false) @map("is_deleted")
+  media           EventMedia[]
+
+  @@map("events")
+}
+
+model EventMedia {
+  id           String    @id @default(uuid())
+  eventId      String    @map("event_id")
+  mediaType    MediaType @map("media_type")
+  storageUrl   String    @map("storage_url")
+  fileName     String    @map("file_name")
+  fileSize     Int       @map("file_size")
+  displayOrder Int       @default(0) @map("display_order")
+  caption      String?
+  createdAt    DateTime  @default(now()) @map("created_at")
+  event        Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@map("event_media")
+}
+
+model Image {
+  id            String   @id @default(uuid())
+  title         String
+  altText       String   @map("alt_text")
+  description   String?
+  storageUrl    String   @map("storage_url")
+  fileName      String   @map("file_name")
+  fileSize      Int      @map("file_size")
+  isSliderImage Boolean  @default(false) @map("is_slider_image")
+  isPublished   Boolean  @default(true) @map("is_published")
+  displayOrder  Int      @default(0) @map("display_order")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  isDeleted     Boolean  @default(false) @map("is_deleted")
+
+  @@map("images")
+}
+
+model NotificationLog {
+  id               String              @id @default(uuid())
+  subscriberId     String?             @map("subscriber_id")
+  recipientEmail   String?             @map("recipient_email")
+  recipientPhone   String?             @map("recipient_phone")
+  notificationType NotificationType    @map("notification_type")
+  channel          NotificationChannel
+  subject          String?
+  message          String
+  deliveryStatus   DeliveryStatus      @default(PENDING) @map("delivery_status")
+  externalId       String?             @map("external_id")
+  errorMessage     String?             @map("error_message")
+  sentAt           DateTime?           @map("sent_at")
+  deliveredAt      DateTime?           @map("delivered_at")
+  createdAt        DateTime            @default(now()) @map("created_at")
+  subscriber       Subscriber?         @relation(fields: [subscriberId], references: [id])
+
+  @@map("notification_logs")
+}
+
+model ContactSubmission {
+  id          String   @id @default(uuid())
+  fullName    String   @map("full_name")
+  email       String
+  phoneNumber String?  @map("phone_number")
+  subject     String
+  message     String
+  isRead      Boolean  @default(false) @map("is_read")
+  isReplied   Boolean  @default(false) @map("is_replied")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("contact_submissions")
+}
+
+model SystemSetting {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  value       String
+  category    String   @default("general")
+  description String?
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("system_settings")
+}
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  CONTENT_MANAGER
+}
+
+enum NotificationType {
+  PAYMENT_REMINDER
+  EVENT_NOTIFICATION
+  GENERAL
+}
+
+enum NotificationChannel {
+  EMAIL
+  SMS
+  BOTH
+}
+
+enum DeliveryStatus {
+  PENDING
+  SENT
+  DELIVERED
+  FAILED
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+}
+
+enum SubscriberType {
+  PERMANENT
+  GENERAL
+  SUPPORTER
+}
+
+enum PaymentType {
+  DONATION
+  ZAKAT
+  MEMBER_FEE
+  CHARITY
+}
+
+model Page {
+  id              String   @id @default(uuid())
+  slug            String   @unique
+  title           String
+  content         String   @db.Text
+  metaDescription String?  @map("meta_description") @db.VarChar(160)
+  isPublished     Boolean  @default(true) @map("is_published")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("pages")
+}
