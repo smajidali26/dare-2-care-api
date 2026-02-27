@@ -5,6 +5,11 @@ import { asyncHandler } from '../utils/asyncHandler';
 export class PageController {
   constructor(private pageService: PageService) {}
 
+  create = asyncHandler(async (req: Request, res: Response) => {
+    const page = await this.pageService.createPage(req.body);
+    res.status(201).json({ success: true, data: page, message: 'Page created successfully' });
+  });
+
   list = asyncHandler(async (req: Request, res: Response) => {
     const pages = await this.pageService.getAllPages();
     res.json({ success: true, data: pages });

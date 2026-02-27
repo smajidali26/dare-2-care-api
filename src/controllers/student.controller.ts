@@ -1,45 +1,33 @@
-import { Response, NextFunction } from 'express';
-import { AuthenticatedRequest } from '../types/auth.types';
+import { Request, Response } from 'express';
 import * as studentService from '../services/student.service';
+import { asyncHandler } from '../utils/asyncHandler';
 import { getParamAsString } from '../utils/params.util';
-import {
-  createStudentSchema,
-  updateStudentSchema,
-  studentQuerySchema,
-} from '../validators/student.validator';
-import { ApiError } from '../middleware/errorHandler.middleware';
-import { ZodError } from 'zod';
+import { AppError } from '../utils/AppError';
 
 /**
  * Student Controller
  * Handles student management HTTP requests
  */
-
-/**
- * Get all students
- * GET /api/admin/students
- */
-export const getAllStudents = async (
-  req: AuthenticatedRequest,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  try {
-    // Validate query params
-    const query = studentQuerySchema.parse(req.query);
+export class StudentController {
+  /**
+   * GET /api/admin/students
+   * List all students with pagination and filters
+   */
+  list = asyncHandler(async (req: Request, res: Response) => {
+    const { search, page, limit, isActive, gender, grade, schoolName } = req.query;
 
     // Build filters
     const filters: any = {};
-    if (query.isActive !== undefined) filters.isActive = query.isActive;
-    if (query.gender) filters.gender = query.gender;
-    if (query.grade) filters.grade = query.grade;
-    if (query.schoolName) filters.schoolName = query.schoolName;
+    if (isActive !== undefined) filters.isActive = isActive === 'true';
+    if (gender) filters.gender = gender;
+    if (grade) filters.grade = grade;
+    if (schoolName) filters.schoolName = schoolName;
 
     // Get students
     const result = await studentService.getAllStudents(
-      query.search,
+      search as string | undefined,
       filters,
-      { page: query.page, limit: query.limit }
+      { page: Number(page) || 1, limit: Number(limit) || 10 }
     );
 
     res.status(200).json({
@@ -52,65 +40,40 @@ export const getAllStudents = async (
         totalPages: result.totalPages,
       },
     });
-  } catch (error) {
-    if (error instanceof ZodError) {
-      next(new ApiError(400, error.errors[0].message));
-    } else {
-      next(error);
-    }
-  }
-};
+  });
 
-/**
- * Get student by ID
- * GET /api/admin/students/:id
- */
-export const getStudentById = async (
-  req: AuthenticatedRequest,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  try {
+  /**
+   * GET /api/admin/students/:id
+   * Get single student by ID
+   */
+  get = asyncHandler(async (req: Request, res: Response) => {
     const id = getParamAsString(req.params.id);
-
     const student = await studentService.findById(id);
 
     if (!student) {
-      throw new ApiError(404, 'Student not found');
+      throw new AppError('Student not found', 404);
     }
 
     res.status(200).json({
       success: true,
       data: student,
     });
-  } catch (error) {
-    next(error);
-  }
-};
+  });
 
-/**
- * Create new student
- * POST /api/admin/students
- */
-export const createStudent = async (
-  req: AuthenticatedRequest,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  try {
-    // Validate request body
-    const validatedData = createStudentSchema.parse(req.body);
-
+  /**
+   * POST /api/admin/students
+   * Create new student
+   */
+  create = asyncHandler(async (req: Request, res: Response) => {
     // Convert date strings to Date objects if needed
-    const studentData: any = { ...validatedData };
-    if (validatedData.dateOfBirth) {
-      studentData.dateOfBirth = new Date(validatedData.dateOfBirth);
+    const studentData: any = { ...req.body };
+    if (req.body.dateOfBirth) {
+      studentData.dateOfBirth = new Date(req.body.dateOfBirth);
     }
-    if (validatedData.enrollmentDate) {
-      studentData.enrollmentDate = new Date(validatedData.enrollmentDate);
+    if (req.body.enrollmentDate) {
+      studentData.enrollmentDate = new Date(req.body.enrollmentDate);
     }
 
-    // Create student
     const student = await studentService.createStudent(studentData);
 
     res.status(201).json({
@@ -118,42 +81,24 @@ export const createStudent = async (
       data: student,
       message: 'Student created successfully',
     });
-  } catch (error) {
-    if (error instanceof ZodError) {
-      next(new ApiError(400, error.errors[0].message));
-    } else if (error instanceof Error && error.message.includes('age')) {
-      next(new ApiError(400, error.message));
-    } else {
-      next(error);
-    }
-  }
-};
+  });
 
-/**
- * Update student
- * PUT /api/admin/students/:id
- */
-export const updateStudent = async (
-  req: AuthenticatedRequest,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  try {
+  /**
+   * PUT /api/admin/students/:id
+   * Update student
+   */
+  update = asyncHandler(async (req: Request, res: Response) => {
     const id = getParamAsString(req.params.id);
 
-    // Validate request body
-    const validatedData = updateStudentSchema.parse(req.body);
-
     // Convert date strings to Date objects if needed
-    const studentData: any = { ...validatedData };
-    if (validatedData.dateOfBirth) {
-      studentData.dateOfBirth = new Date(validatedData.dateOfBirth);
+    const studentData: any = { ...req.body };
+    if (req.body.dateOfBirth) {
+      studentData.dateOfBirth = new Date(req.body.dateOfBirth);
     }
-    if (validatedData.enrollmentDate) {
-      studentData.enrollmentDate = new Date(validatedData.enrollmentDate);
+    if (req.body.enrollmentDate) {
+      studentData.enrollmentDate = new Date(req.body.enrollmentDate);
     }
 
-    // Update student
     const student = await studentService.updateStudent(id, studentData);
 
     res.status(200).json({
@@ -161,47 +106,19 @@ export const updateStudent = async (
       data: student,
       message: 'Student updated successfully',
     });
-  } catch (error) {
-    if (error instanceof ZodError) {
-      next(new ApiError(400, error.errors[0].message));
-    } else if (error instanceof Error) {
-      if (error.message === 'Student not found') {
-        next(new ApiError(404, error.message));
-      } else if (error.message.includes('age')) {
-        next(new ApiError(400, error.message));
-      } else {
-        next(error);
-      }
-    } else {
-      next(error);
-    }
-  }
-};
+  });
 
-/**
- * Delete student (soft delete)
- * DELETE /api/admin/students/:id
- */
-export const deleteStudent = async (
-  req: AuthenticatedRequest,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  try {
+  /**
+   * DELETE /api/admin/students/:id
+   * Delete student (soft delete)
+   */
+  delete = asyncHandler(async (req: Request, res: Response) => {
     const id = getParamAsString(req.params.id);
-
-    // Delete student
     await studentService.deleteStudent(id);
 
     res.status(200).json({
       success: true,
       message: 'Student deleted successfully',
     });
-  } catch (error) {
-    if (error instanceof Error && error.message === 'Student not found') {
-      next(new ApiError(404, error.message));
-    } else {
-      next(error);
-    }
-  }
-};
+  });
+}

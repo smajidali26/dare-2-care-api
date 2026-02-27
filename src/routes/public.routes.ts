@@ -18,6 +18,7 @@ import { PageRepository } from '../repositories/page.repository';
 import { PageService } from '../services/page.service';
 import { PageController } from '../controllers/page.controller';
 import { pageSlugSchema } from '../validators/page.validator';
+import { generalRateLimiter, contactRateLimiter } from '../middleware/rateLimit.middleware';
 
 /**
  * Public Routes
@@ -25,6 +26,9 @@ import { pageSlugSchema } from '../validators/page.validator';
  */
 
 const router = Router();
+
+// Apply general rate limiter to all public routes
+router.use(generalRateLimiter);
 
 /**
  * Initialize Services
@@ -63,8 +67,8 @@ router.get('/images/slider', imageController.getSliderImages);
 /**
  * Contact Routes
  */
-// Submit contact form
-router.post('/contact', validate(submitContactSchema), contactController.submit);
+// Submit contact form (with stricter rate limit to prevent spam)
+router.post('/contact', contactRateLimiter, validate(submitContactSchema), contactController.submit);
 
 /**
  * Management Routes

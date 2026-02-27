@@ -77,12 +77,6 @@ app.use('/api/health', healthRoutes);
 app.use('/api/auth', authRoutes);
 
 /**
- * Debug Routes (temporary)
- */
-import debugRoutes from './routes/debug.routes';
-app.use('/api/debug', debugRoutes);
-
-/**
  * Admin Routes
  */
 import adminRoutes from './routes/admin.routes';

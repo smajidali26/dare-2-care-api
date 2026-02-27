@@ -5,6 +5,20 @@ import { AppError } from '../utils/AppError';
 export class PageService {
   constructor(private pageRepository: PageRepository) {}
 
+  async createPage(data: {
+    slug: string;
+    title: string;
+    content: string;
+    metaDescription?: string | null;
+    isPublished?: boolean;
+  }): Promise<Page> {
+    const existing = await this.pageRepository.findBySlug(data.slug);
+    if (existing) {
+      throw new AppError('A page with this slug already exists', 409);
+    }
+    return this.pageRepository.create(data);
+  }
+
   async getPageBySlug(slug: string): Promise<Page | null> {
     return this.pageRepository.findBySlug(slug);
   }

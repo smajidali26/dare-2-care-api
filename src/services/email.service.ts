@@ -3,10 +3,11 @@
  * Handles email sending via Resend
  *
  * Setup Instructions:
- * 1. Install Resend: npm install resend
- * 2. Add RESEND_API_KEY to .env
- * 3. Add FROM_EMAIL to .env (e.g., noreply@dare2care.org)
+ * 1. Add RESEND_API_KEY to .env
+ * 2. Add FROM_EMAIL to .env (e.g., noreply@dare2care.org or Dare2Care <noreply@dare2care.org>)
  */
+
+import { Resend } from 'resend';
 
 interface EmailOptions {
   to: string | string[];
@@ -18,10 +19,14 @@ interface EmailOptions {
 export class EmailService {
   private fromEmail: string;
   private isConfigured: boolean;
+  private resend: Resend | null;
 
   constructor() {
     this.fromEmail = process.env.FROM_EMAIL || 'noreply@dare2care.org';
     this.isConfigured = !!process.env.RESEND_API_KEY;
+    this.resend = this.isConfigured
+      ? new Resend(process.env.RESEND_API_KEY)
+      : null;
   }
 
   /**
@@ -29,11 +34,10 @@ export class EmailService {
    */
   async send(options: EmailOptions): Promise<{ id: string; success: boolean; error?: string }> {
     try {
-      // Check if email service is configured
-      if (!this.isConfigured) {
-        console.warn('Email service not configured. Email would be sent to:', options.to);
-        console.warn('Subject:', options.subject);
-        console.warn('Body:', options.html);
+      // Fallback to console logging if Resend is not configured
+      if (!this.isConfigured || !this.resend) {
+        console.warn('[EmailService] Not configured (RESEND_API_KEY missing). Email would be sent to:', options.to);
+        console.warn('[EmailService] Subject:', options.subject);
 
         return {
           id: `mock-${Date.now()}`,
@@ -41,35 +45,35 @@ export class EmailService {
         };
       }
 
-      // TODO: Implement Resend integration
-      // const { Resend } = require('resend');
-      // const resend = new Resend(process.env.RESEND_API_KEY);
-      //
-      // const result = await resend.emails.send({
-      //   from: this.fromEmail,
-      //   to: Array.isArray(options.to) ? options.to : [options.to],
-      //   subject: options.subject,
-      //   html: options.html,
-      //   text: options.text,
-      // });
-      //
-      // return {
-      //   id: result.id,
-      //   success: true,
-      // };
+      const { data, error } = await this.resend.emails.send({
+        from: this.fromEmail,
+        to: Array.isArray(options.to) ? options.to : [options.to],
+        subject: options.subject,
+        html: options.html,
+        text: options.text,
+      });
 
-      // Mock implementation for now
-      console.log('Email sent (mock):', {
+      if (error) {
+        console.error('[EmailService] Resend API error:', error);
+        return {
+          id: '',
+          success: false,
+          error: error.message || 'Resend API error',
+        };
+      }
+
+      console.log('[EmailService] Email sent successfully:', {
+        id: data?.id,
         to: options.to,
         subject: options.subject,
       });
 
       return {
-        id: `mock-${Date.now()}`,
+        id: data?.id || '',
         success: true,
       };
     } catch (error: any) {
-      console.error('Email send error:', error);
+      console.error('[EmailService] Send error:', error);
       return {
         id: '',
         success: false,

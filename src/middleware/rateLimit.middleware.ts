@@ -40,3 +40,20 @@ export const generalRateLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
+
+/**
+ * Contact form rate limiter
+ * Allows 5 submissions per 15 minutes per IP to prevent spam
+ */
+export const contactRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // Limit each IP to 5 submissions per windowMs
+  message: {
+    success: false,
+    error: {
+      message: 'Too many contact form submissions. Please try again after 15 minutes.',
+    },
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});

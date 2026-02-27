@@ -1,46 +1,43 @@
-import { Response, NextFunction } from 'express';
-import { AuthenticatedRequest } from '../types/auth.types';
+import { Request, Response } from 'express';
 import * as subscriberService from '../services/subscriber.service';
+import { asyncHandler } from '../utils/asyncHandler';
 import { getParamAsString } from '../utils/params.util';
-import {
-  createSubscriberSchema,
-  updateSubscriberSchema,
-  subscriberQuerySchema,
-} from '../validators/subscriber.validator';
-import { ApiError } from '../middleware/errorHandler.middleware';
-import { ZodError } from 'zod';
+import { AppError } from '../utils/AppError';
 
 /**
  * Subscriber Controller
  * Handles subscriber management HTTP requests
  */
-
-/**
- * Get all subscribers
- * GET /api/admin/subscribers
- */
-export const getAllSubscribers = async (
-  req: AuthenticatedRequest,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  try {
-    // Validate query params
-    const query = subscriberQuerySchema.parse(req.query);
+export class SubscriberController {
+  /**
+   * GET /api/admin/subscribers
+   * List all subscribers with pagination and filters
+   */
+  list = asyncHandler(async (req: Request, res: Response) => {
+    const {
+      search,
+      page,
+      limit,
+      isActive,
+      isManagement,
+      paymentDayOfMonth,
+      subscriberType,
+      paymentType,
+    } = req.query;
 
     // Build filters
     const filters: any = {};
-    if (query.isActive !== undefined) filters.isActive = query.isActive;
-    if (query.isManagement !== undefined) filters.isManagement = query.isManagement;
-    if (query.paymentDayOfMonth) filters.paymentDayOfMonth = query.paymentDayOfMonth;
-    if (query.subscriberType) filters.subscriberType = query.subscriberType;
-    if (query.paymentType) filters.paymentType = query.paymentType;
+    if (isActive !== undefined) filters.isActive = isActive === 'true';
+    if (isManagement !== undefined) filters.isManagement = isManagement === 'true';
+    if (paymentDayOfMonth) filters.paymentDayOfMonth = Number(paymentDayOfMonth);
+    if (subscriberType) filters.subscriberType = subscriberType;
+    if (paymentType) filters.paymentType = paymentType;
 
     // Get subscribers
     const result = await subscriberService.getAllSubscribers(
-      query.search,
+      search as string | undefined,
       filters,
-      { page: query.page, limit: query.limit }
+      { page: Number(page) || 1, limit: Number(limit) || 10 }
     );
 
     res.status(200).json({
@@ -53,65 +50,40 @@ export const getAllSubscribers = async (
         totalPages: result.totalPages,
       },
     });
-  } catch (error) {
-    if (error instanceof ZodError) {
-      next(new ApiError(400, error.errors[0].message));
-    } else {
-      next(error);
-    }
-  }
-};
+  });
 
-/**
- * Get subscriber by ID
- * GET /api/admin/subscribers/:id
- */
-export const getSubscriberById = async (
-  req: AuthenticatedRequest,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  try {
+  /**
+   * GET /api/admin/subscribers/:id
+   * Get single subscriber by ID
+   */
+  get = asyncHandler(async (req: Request, res: Response) => {
     const id = getParamAsString(req.params.id);
-
     const subscriber = await subscriberService.findById(id);
 
     if (!subscriber) {
-      throw new ApiError(404, 'Subscriber not found');
+      throw new AppError('Subscriber not found', 404);
     }
 
     res.status(200).json({
       success: true,
       data: subscriber,
     });
-  } catch (error) {
-    next(error);
-  }
-};
+  });
 
-/**
- * Create new subscriber
- * POST /api/admin/subscribers
- */
-export const createSubscriber = async (
-  req: AuthenticatedRequest,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  try {
-    // Validate request body
-    const validatedData = createSubscriberSchema.parse(req.body);
-
+  /**
+   * POST /api/admin/subscribers
+   * Create new subscriber
+   */
+  create = asyncHandler(async (req: Request, res: Response) => {
     // Convert date strings to Date objects if needed
-    const subscriberData: any = { ...validatedData };
-    if (validatedData.subscriptionStartDate) {
-      subscriberData.subscriptionStartDate = new Date(validatedData.subscriptionStartDate);
+    const subscriberData: any = { ...req.body };
+    if (req.body.subscriptionStartDate) {
+      subscriberData.subscriptionStartDate = new Date(req.body.subscriptionStartDate);
     }
-    if (validatedData.subscriptionEndDate) {
-      subscriberData.subscriptionEndDate = new Date(validatedData.subscriptionEndDate);
+    if (req.body.subscriptionEndDate) {
+      subscriberData.subscriptionEndDate = new Date(req.body.subscriptionEndDate);
     }
 
-    // Create subscriber
     const subscriber = await subscriberService.createSubscriber(subscriberData);
 
     res.status(201).json({
@@ -119,42 +91,24 @@ export const createSubscriber = async (
       data: subscriber,
       message: 'Subscriber created successfully',
     });
-  } catch (error) {
-    if (error instanceof ZodError) {
-      next(new ApiError(400, error.errors[0].message));
-    } else if (error instanceof Error && error.message === 'Email already exists') {
-      next(new ApiError(409, error.message));
-    } else {
-      next(error);
-    }
-  }
-};
+  });
 
-/**
- * Update subscriber
- * PUT /api/admin/subscribers/:id
- */
-export const updateSubscriber = async (
-  req: AuthenticatedRequest,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  try {
+  /**
+   * PUT /api/admin/subscribers/:id
+   * Update subscriber
+   */
+  update = asyncHandler(async (req: Request, res: Response) => {
     const id = getParamAsString(req.params.id);
 
-    // Validate request body
-    const validatedData = updateSubscriberSchema.parse(req.body);
-
     // Convert date strings to Date objects if needed
-    const subscriberData: any = { ...validatedData };
-    if (validatedData.subscriptionStartDate) {
-      subscriberData.subscriptionStartDate = new Date(validatedData.subscriptionStartDate);
+    const subscriberData: any = { ...req.body };
+    if (req.body.subscriptionStartDate) {
+      subscriberData.subscriptionStartDate = new Date(req.body.subscriptionStartDate);
     }
-    if (validatedData.subscriptionEndDate) {
-      subscriberData.subscriptionEndDate = new Date(validatedData.subscriptionEndDate);
+    if (req.body.subscriptionEndDate) {
+      subscriberData.subscriptionEndDate = new Date(req.body.subscriptionEndDate);
     }
 
-    // Update subscriber
     const subscriber = await subscriberService.updateSubscriber(id, subscriberData);
 
     res.status(200).json({
@@ -162,61 +116,27 @@ export const updateSubscriber = async (
       data: subscriber,
       message: 'Subscriber updated successfully',
     });
-  } catch (error) {
-    if (error instanceof ZodError) {
-      next(new ApiError(400, error.errors[0].message));
-    } else if (error instanceof Error) {
-      if (error.message === 'Subscriber not found') {
-        next(new ApiError(404, error.message));
-      } else if (error.message === 'Email already exists') {
-        next(new ApiError(409, error.message));
-      } else {
-        next(error);
-      }
-    } else {
-      next(error);
-    }
-  }
-};
+  });
 
-/**
- * Delete subscriber (soft delete)
- * DELETE /api/admin/subscribers/:id
- */
-export const deleteSubscriber = async (
-  req: AuthenticatedRequest,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  try {
+  /**
+   * DELETE /api/admin/subscribers/:id
+   * Delete subscriber (soft delete)
+   */
+  delete = asyncHandler(async (req: Request, res: Response) => {
     const id = getParamAsString(req.params.id);
-
-    // Delete subscriber
     await subscriberService.deleteSubscriber(id);
 
     res.status(200).json({
       success: true,
       message: 'Subscriber deleted successfully',
     });
-  } catch (error) {
-    if (error instanceof Error && error.message === 'Subscriber not found') {
-      next(new ApiError(404, error.message));
-    } else {
-      next(error);
-    }
-  }
-};
+  });
 
-/**
- * Get management members (public endpoint)
- * GET /api/public/management
- */
-export const getManagementMembers = async (
-  req: AuthenticatedRequest,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  try {
+  /**
+   * GET /api/public/management
+   * Get management members (public endpoint)
+   */
+  getManagementMembers = asyncHandler(async (req: Request, res: Response) => {
     const members = await subscriberService.getManagementMembers();
 
     // Remove sensitive subscriber data, only return management info
@@ -233,7 +153,5 @@ export const getManagementMembers = async (
       success: true,
       data: publicMembers,
     });
-  } catch (error) {
-    next(error);
-  }
-};
+  });
+}

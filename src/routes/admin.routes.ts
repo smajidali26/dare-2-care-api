@@ -47,7 +47,12 @@ import { notificationFiltersSchema, notificationIdSchema } from '../validators/n
 import { PageRepository } from '../repositories/page.repository';
 import { PageService } from '../services/page.service';
 import { PageController } from '../controllers/page.controller';
-import { updatePageSchema, pageSlugSchema } from '../validators/page.validator';
+import { createPageSchema, updatePageSchema, pageSlugSchema } from '../validators/page.validator';
+import { SettingRepository } from '../repositories/setting.repository';
+import { SettingService } from '../services/setting.service';
+import { SettingController } from '../controllers/setting.controller';
+import { upsertSettingSchema, settingKeySchema, settingQuerySchema } from '../validators/setting.validator';
+import { generalRateLimiter } from '../middleware/rateLimit.middleware';
 
 /**
  * Admin Routes
@@ -57,7 +62,8 @@ import { updatePageSchema, pageSlugSchema } from '../validators/page.validator';
 
 const router = Router();
 
-// Apply authentication middleware to all admin routes
+// Apply rate limiter and authentication middleware to all admin routes
+router.use(generalRateLimiter);
 router.use(authenticateToken);
 
 /**
@@ -254,6 +260,7 @@ router.get('/notifications/:id', validate(notificationIdSchema), notificationCon
  * Accessible to all authenticated admin users
  */
 router.get('/pages', pageController.list);
+router.post('/pages', validate(createPageSchema), pageController.create);
 router.get('/pages/:slug', validate(pageSlugSchema), pageController.getBySlug);
 router.put('/pages/:slug', validate(updatePageSchema), pageController.update);
 

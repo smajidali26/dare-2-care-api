@@ -14,6 +14,24 @@ export class PageRepository {
     return prisma.page.findMany({ orderBy: { updatedAt: 'desc' } });
   }
 
+  async create(data: {
+    slug: string;
+    title: string;
+    content: string;
+    metaDescription?: string | null;
+    isPublished?: boolean;
+  }): Promise<Page> {
+    return prisma.page.create({
+      data: {
+        slug: data.slug,
+        title: data.title,
+        content: data.content,
+        metaDescription: data.metaDescription,
+        isPublished: data.isPublished ?? true,
+      },
+    });
+  }
+
   async upsertBySlug(
     slug: string,
     data: {
