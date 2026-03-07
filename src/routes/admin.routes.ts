@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import { authenticateToken, requireRole } from '../middleware/auth.middleware';
 import * as statsController from '../controllers/stats.controller';
-import * as userController from '../controllers/user.controller';
-import * as subscriberController from '../controllers/subscriber.controller';
-import * as studentController from '../controllers/student.controller';
-import * as teacherController from '../controllers/teacher.controller';
+import { UserController } from '../controllers/user.controller';
+import { SubscriberController } from '../controllers/subscriber.controller';
+import { StudentController } from '../controllers/student.controller';
+import { TeacherController } from '../controllers/teacher.controller';
 import uploadController from '../controllers/upload.controller';
 import {
   uploadSingleImage,
@@ -67,6 +67,14 @@ router.use(generalRateLimiter);
 router.use(authenticateToken);
 
 /**
+ * Initialize User, Subscriber, Student, Teacher Controllers
+ */
+const userController = new UserController();
+const subscriberController = new SubscriberController();
+const studentController = new StudentController();
+const teacherController = new TeacherController();
+
+/**
  * Initialize Event Services
  */
 const eventRepository = new EventRepository(prisma);
@@ -114,62 +122,62 @@ router.get('/stats', statsController.getStats);
 router.get(
   '/users',
   requireRole(['SUPER_ADMIN', 'ADMIN']),
-  userController.getAllUsers
+  userController.list
 );
 
 router.get(
   '/users/:id',
   requireRole(['SUPER_ADMIN', 'ADMIN']),
-  userController.getUserById
+  userController.get
 );
 
 router.post(
   '/users',
   requireRole(['SUPER_ADMIN']),
-  userController.createUser
+  userController.create
 );
 
 router.put(
   '/users/:id',
   requireRole(['SUPER_ADMIN', 'ADMIN']),
-  userController.updateUser
+  userController.update
 );
 
 router.delete(
   '/users/:id',
   requireRole(['SUPER_ADMIN']),
-  userController.deleteUser
+  userController.delete
 );
 
 /**
  * Subscriber Management Routes
  * Accessible to all authenticated admin users
  */
-router.get('/subscribers', subscriberController.getAllSubscribers);
-router.get('/subscribers/:id', subscriberController.getSubscriberById);
-router.post('/subscribers', subscriberController.createSubscriber);
-router.put('/subscribers/:id', subscriberController.updateSubscriber);
-router.delete('/subscribers/:id', subscriberController.deleteSubscriber);
+router.get('/subscribers', subscriberController.list);
+router.get('/subscribers/:id', subscriberController.get);
+router.post('/subscribers', subscriberController.create);
+router.put('/subscribers/:id', subscriberController.update);
+router.delete('/subscribers/:id', subscriberController.delete);
 
 /**
  * Student Management Routes
  * Accessible to all authenticated admin users
  */
-router.get('/students', studentController.getAllStudents);
-router.get('/students/:id', studentController.getStudentById);
-router.post('/students', studentController.createStudent);
-router.put('/students/:id', studentController.updateStudent);
-router.delete('/students/:id', studentController.deleteStudent);
+router.get('/students', studentController.list);
+router.get('/students/:id', studentController.get);
+router.post('/students', studentController.create);
+router.put('/students/:id', studentController.update);
+router.delete('/students/:id', studentController.delete);
 
 /**
  * Teacher Management Routes
  * Accessible to all authenticated admin users
  */
-router.get('/teachers', teacherController.getAllTeachers);
-router.get('/teachers/:id', teacherController.getTeacherById);
-router.post('/teachers', teacherController.createTeacher);
-router.put('/teachers/:id', teacherController.updateTeacher);
-router.delete('/teachers/:id', teacherController.deleteTeacher);
+router.get('/teachers', teacherController.list);
+router.get('/teachers/:id', teacherController.get);
+router.post('/teachers', teacherController.create);
+router.put('/teachers/:id', teacherController.update);
+router.delete('/teachers/:id', teacherController.delete);
 
 /**
  * File Upload Routes

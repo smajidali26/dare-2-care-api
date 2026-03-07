@@ -9,7 +9,7 @@ import { ImageController } from '../controllers/image.controller';
 import { ContactRepository } from '../repositories/contact.repository';
 import { ContactService } from '../services/contact.service';
 import { ContactController } from '../controllers/contact.controller';
-import * as subscriberController from '../controllers/subscriber.controller';
+import { SubscriberController } from '../controllers/subscriber.controller';
 import { validate } from '../middleware/validate.middleware';
 import { eventFiltersSchema, eventSlugSchema } from '../validators/event.validator';
 import { submitContactSchema } from '../validators/contact.validator';
@@ -48,6 +48,8 @@ const contactController = new ContactController(contactService);
 const pageRepository = new PageRepository();
 const pageService = new PageService(pageRepository);
 const pageController = new PageController(pageService);
+
+const subscriberController = new SubscriberController();
 
 /**
  * Event Routes
