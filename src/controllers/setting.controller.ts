@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { SettingService } from '../services/setting.service';
 import { asyncHandler } from '../utils/asyncHandler';
+import { getParamAsString } from '../utils/params.util';
 
 export class SettingController {
   constructor(private settingService: SettingService) {}
@@ -14,7 +15,7 @@ export class SettingController {
   });
 
   get = asyncHandler(async (req: Request, res: Response) => {
-    const setting = await this.settingService.getByKey(req.params.key);
+    const setting = await this.settingService.getByKey(getParamAsString(req.params.key));
     if (!setting) {
       return res.status(404).json({ success: false, message: 'Setting not found' });
     }
@@ -27,7 +28,7 @@ export class SettingController {
   });
 
   delete = asyncHandler(async (req: Request, res: Response) => {
-    await this.settingService.deleteSetting(req.params.key);
+    await this.settingService.deleteSetting(getParamAsString(req.params.key));
     res.json({ success: true, message: 'Setting deleted successfully' });
   });
 }

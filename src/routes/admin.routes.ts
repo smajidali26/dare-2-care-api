@@ -110,6 +110,13 @@ const pageService = new PageService(pageRepository);
 const pageController = new PageController(pageService);
 
 /**
+ * Initialize Setting Services
+ */
+const settingRepository = new SettingRepository();
+const settingService = new SettingService(settingRepository);
+const settingController = new SettingController(settingService);
+
+/**
  * Dashboard Stats Route
  * Accessible to all authenticated admin users
  */
@@ -243,10 +250,10 @@ router.delete('/images/:id', validate(imageIdSchema), imageController.delete);
 router.put('/images/:id/publish', validate(imageIdSchema), imageController.publish);
 router.put('/images/:id/unpublish', validate(imageIdSchema), imageController.unpublish);
 
-// Slider image management
+// Slider image management (static route before dynamic :id routes)
+router.put('/images/slider/reorder', validate(reorderSliderImagesSchema), imageController.reorderSlider);
 router.put('/images/:id/slider', validate(imageIdSchema), imageController.markAsSlider);
 router.delete('/images/:id/slider', validate(imageIdSchema), imageController.unmarkAsSlider);
-router.put('/images/slider/reorder', validate(reorderSliderImagesSchema), imageController.reorderSlider);
 
 /**
  * Contact Submission Management Routes (Admin)
@@ -271,5 +278,14 @@ router.get('/pages', pageController.list);
 router.post('/pages', validate(createPageSchema), pageController.create);
 router.get('/pages/:slug', validate(pageSlugSchema), pageController.getBySlug);
 router.put('/pages/:slug', validate(updatePageSchema), pageController.update);
+
+/**
+ * System Settings Routes (Admin)
+ * Restricted to SUPER_ADMIN role
+ */
+router.get('/settings', requireRole(['SUPER_ADMIN']), validate(settingQuerySchema), settingController.list);
+router.get('/settings/:key', requireRole(['SUPER_ADMIN']), validate(settingKeySchema), settingController.get);
+router.post('/settings', requireRole(['SUPER_ADMIN']), validate(upsertSettingSchema), settingController.upsert);
+router.delete('/settings/:key', requireRole(['SUPER_ADMIN']), validate(settingKeySchema), settingController.delete);
 
 export default router;
