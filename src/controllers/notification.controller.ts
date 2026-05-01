@@ -51,4 +51,18 @@ export class NotificationController {
       data: notification,
     });
   });
+
+  /**
+   * POST /api/admin/notifications/send
+   * Broadcast a notification to filtered subscribers.
+   */
+  send = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    const result = await this.notificationService.broadcast(req.body);
+
+    res.json({
+      success: true,
+      message: 'Broadcast complete',
+      data: result,
+    });
+  });
 }

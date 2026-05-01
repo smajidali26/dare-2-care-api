@@ -1,6 +1,7 @@
 import teacherRepository from '../repositories/teacher.repository';
 import { Teacher } from '@prisma/client';
 import { PaginationOptions, FilterOptions } from '../repositories/base.repository';
+import { AppError } from '../utils/AppError';
 
 /**
  * Teacher Service
@@ -58,16 +59,16 @@ export const createTeacher = async (teacherData: {
   // Check if email already exists
   const existingTeacher = await teacherRepository.findByEmail(teacherData.email);
   if (existingTeacher) {
-    throw new Error('Email already exists');
+    throw new AppError('Email already exists', 409);
   }
 
   // Validate experience
   if (teacherData.experience < 0) {
-    throw new Error('Experience cannot be negative');
+    throw new AppError('Experience cannot be negative', 400);
   }
 
   if (teacherData.experience > 50) {
-    throw new Error('Experience seems unrealistic (max 50 years)');
+    throw new AppError('Experience seems unrealistic (max 50 years)', 400);
   }
 
   // Create teacher
@@ -105,24 +106,24 @@ export const updateTeacher = async (
   // Check if teacher exists
   const existingTeacher = await teacherRepository.findById(id);
   if (!existingTeacher) {
-    throw new Error('Teacher not found');
+    throw new AppError('Teacher not found', 404);
   }
 
   // If email is being updated, check for duplicates
   if (teacherData.email && teacherData.email !== existingTeacher.email) {
     const emailExists = await teacherRepository.emailExists(teacherData.email, id);
     if (emailExists) {
-      throw new Error('Email already exists');
+      throw new AppError('Email already exists', 409);
     }
   }
 
   // Validate experience if provided
   if (teacherData.experience !== undefined) {
     if (teacherData.experience < 0) {
-      throw new Error('Experience cannot be negative');
+      throw new AppError('Experience cannot be negative', 400);
     }
     if (teacherData.experience > 50) {
-      throw new Error('Experience seems unrealistic (max 50 years)');
+      throw new AppError('Experience seems unrealistic (max 50 years)', 400);
     }
   }
 
@@ -139,7 +140,7 @@ export const deleteTeacher = async (id: string): Promise<Teacher> => {
   // Check if teacher exists
   const existingTeacher = await teacherRepository.findById(id);
   if (!existingTeacher) {
-    throw new Error('Teacher not found');
+    throw new AppError('Teacher not found', 404);
   }
 
   // Soft delete teacher
@@ -153,4 +154,15 @@ export const deleteTeacher = async (id: string): Promise<Teacher> => {
  */
 export const getActiveTeachers = async (pagination: PaginationOptions = {}) => {
   return teacherRepository.findActive(pagination);
+};
+
+/**
+ * Restore soft-deleted teacher
+ */
+export const restoreTeacher = async (id: string): Promise<Teacher> => {
+  const exists = await teacherRepository.findByIdIncludingDeleted(id);
+  if (!exists) {
+    throw new AppError('Teacher not found', 404);
+  }
+  return teacherRepository.restore(id);
 };

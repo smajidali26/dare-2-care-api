@@ -1,6 +1,7 @@
 import studentRepository from '../repositories/student.repository';
 import { Student } from '@prisma/client';
 import { PaginationOptions, FilterOptions } from '../repositories/base.repository';
+import { AppError } from '../utils/AppError';
 
 /**
  * Student Service
@@ -51,7 +52,7 @@ export const createStudent = async (studentData: {
   // Validate age (optional - ensure student is not too old/young)
   const age = calculateAge(studentData.dateOfBirth);
   if (age < 3 || age > 25) {
-    throw new Error('Student age must be between 3 and 25 years');
+    throw new AppError('Student age must be between 3 and 25 years', 400);
   }
 
   // Create student
@@ -93,14 +94,14 @@ export const updateStudent = async (
   // Check if student exists
   const existingStudent = await studentRepository.findById(id);
   if (!existingStudent) {
-    throw new Error('Student not found');
+    throw new AppError('Student not found', 404);
   }
 
   // Validate age if dateOfBirth is being updated
   if (studentData.dateOfBirth) {
     const age = calculateAge(studentData.dateOfBirth);
     if (age < 3 || age > 25) {
-      throw new Error('Student age must be between 3 and 25 years');
+      throw new AppError('Student age must be between 3 and 25 years', 400);
     }
   }
 
@@ -117,7 +118,7 @@ export const deleteStudent = async (id: string): Promise<Student> => {
   // Check if student exists
   const existingStudent = await studentRepository.findById(id);
   if (!existingStudent) {
-    throw new Error('Student not found');
+    throw new AppError('Student not found', 404);
   }
 
   // Soft delete student
@@ -131,6 +132,17 @@ export const deleteStudent = async (id: string): Promise<Student> => {
  */
 export const getActiveStudents = async (pagination: PaginationOptions = {}) => {
   return studentRepository.findActive(pagination);
+};
+
+/**
+ * Restore soft-deleted student
+ */
+export const restoreStudent = async (id: string): Promise<Student> => {
+  const exists = await studentRepository.findByIdIncludingDeleted(id);
+  if (!exists) {
+    throw new AppError('Student not found', 404);
+  }
+  return studentRepository.restore(id);
 };
 
 /**

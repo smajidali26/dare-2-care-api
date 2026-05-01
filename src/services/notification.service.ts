@@ -1,8 +1,9 @@
-import { NotificationLog, Prisma, Subscriber } from '@prisma/client';
+import { NotificationLog, Prisma, Subscriber, PrismaClient } from '@prisma/client';
 import { NotificationRepository } from '../repositories/notification.repository';
 import { EmailService } from './email.service';
 import { SMSService } from './sms.service';
 import { AppError } from '../utils/AppError';
+import prisma from '../config/database.config';
 
 /**
  * Notification Service
@@ -11,10 +12,15 @@ import { AppError } from '../utils/AppError';
 export class NotificationService {
   private emailService: EmailService;
   private smsService: SMSService;
+  private prisma: PrismaClient;
 
-  constructor(private notificationRepository: NotificationRepository) {
+  constructor(
+    private notificationRepository: NotificationRepository,
+    prismaClient: PrismaClient = prisma
+  ) {
     this.emailService = new EmailService();
     this.smsService = new SMSService();
+    this.prisma = prismaClient;
   }
 
   /**
@@ -45,7 +51,7 @@ export class NotificationService {
 
     const log = await this.notificationRepository.create(logData);
 
-    // Send email
+    // Send email — single status update on success or failure
     try {
       const result = await this.emailService.send({
         to: data.to,
@@ -53,12 +59,11 @@ export class NotificationService {
         html: data.message,
       });
 
-      if (result.success) {
-        await this.notificationRepository.updateStatus(log.id, 'SENT');
-        return this.notificationRepository.updateStatus(log.id, 'DELIVERED');
-      } else {
-        return this.notificationRepository.updateStatus(log.id, 'FAILED', result.error);
-      }
+      return this.notificationRepository.updateStatus(
+        log.id,
+        result.success ? 'DELIVERED' : 'FAILED',
+        result.success ? undefined : result.error
+      );
     } catch (error: any) {
       return this.notificationRepository.updateStatus(log.id, 'FAILED', error.message);
     }
@@ -90,19 +95,18 @@ export class NotificationService {
 
     const log = await this.notificationRepository.create(logData);
 
-    // Send SMS
+    // Send SMS — single status update on success or failure
     try {
       const result = await this.smsService.send({
         to: data.to,
         message: data.message,
       });
 
-      if (result.success) {
-        await this.notificationRepository.updateStatus(log.id, 'SENT');
-        return this.notificationRepository.updateStatus(log.id, 'DELIVERED');
-      } else {
-        return this.notificationRepository.updateStatus(log.id, 'FAILED', result.error);
-      }
+      return this.notificationRepository.updateStatus(
+        log.id,
+        result.success ? 'DELIVERED' : 'FAILED',
+        result.success ? undefined : result.error
+      );
     } catch (error: any) {
       return this.notificationRepository.updateStatus(log.id, 'FAILED', error.message);
     }
@@ -220,5 +224,100 @@ export class NotificationService {
       throw new AppError('Notification log not found', 404);
     }
     return notification;
+  }
+
+  /**
+   * Broadcast a notification to a filtered set of subscribers.
+   * Returns counts and per-recipient outcomes.
+   */
+  async broadcast(input: {
+    channel: 'EMAIL' | 'SMS' | 'BOTH';
+    subject?: string;
+    message: string;
+    subscriberType?: 'PERMANENT' | 'GENERAL' | 'SUPPORTER';
+    paymentType?: 'DONATION' | 'ZAKAT' | 'MEMBER_FEE' | 'CHARITY';
+  }): Promise<{
+    requested: number;
+    emailDelivered: number;
+    emailFailed: number;
+    smsDelivered: number;
+    smsFailed: number;
+    skipped: number;
+  }> {
+    if (!input.message || input.message.trim().length === 0) {
+      throw new AppError('Message is required', 400);
+    }
+    if (input.channel === 'EMAIL' || input.channel === 'BOTH') {
+      if (!input.subject || input.subject.trim().length === 0) {
+        throw new AppError('Subject is required when channel includes EMAIL', 400);
+      }
+    }
+
+    const where: Prisma.SubscriberWhereInput = { isActive: true, isDeleted: false };
+    if (input.subscriberType) where.subscriberType = input.subscriberType;
+    if (input.paymentType) where.paymentType = input.paymentType;
+
+    const subscribers = await this.prisma.subscriber.findMany({ where });
+
+    const totals = {
+      requested: subscribers.length,
+      emailDelivered: 0,
+      emailFailed: 0,
+      smsDelivered: 0,
+      smsFailed: 0,
+      skipped: 0,
+    };
+
+    for (const s of subscribers) {
+      const wantEmail =
+        (input.channel === 'EMAIL' || input.channel === 'BOTH') &&
+        s.emailNotifications &&
+        s.email;
+      const wantSms =
+        (input.channel === 'SMS' || input.channel === 'BOTH') &&
+        s.smsNotifications &&
+        s.phoneNumber;
+
+      if (!wantEmail && !wantSms) {
+        totals.skipped++;
+        continue;
+      }
+
+      // Wrap each per-recipient send so a transient failure on one doesn't abort the broadcast.
+      if (wantEmail) {
+        try {
+          const log = await this.sendEmail({
+            to: s.email,
+            subject: input.subject!,
+            message: input.message,
+            subscriberId: s.id,
+            notificationType: 'GENERAL',
+          });
+          if (log.deliveryStatus === 'DELIVERED') totals.emailDelivered++;
+          else totals.emailFailed++;
+        } catch (err: any) {
+          console.error(`[broadcast] email send failed for subscriber ${s.id}:`, err?.message || err);
+          totals.emailFailed++;
+        }
+      }
+
+      if (wantSms) {
+        try {
+          const log = await this.sendSMS({
+            to: s.phoneNumber,
+            message: input.message,
+            subscriberId: s.id,
+            notificationType: 'GENERAL',
+          });
+          if (log.deliveryStatus === 'DELIVERED') totals.smsDelivered++;
+          else totals.smsFailed++;
+        } catch (err: any) {
+          console.error(`[broadcast] sms send failed for subscriber ${s.id}:`, err?.message || err);
+          totals.smsFailed++;
+        }
+      }
+    }
+
+    return totals;
   }
 }

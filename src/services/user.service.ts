@@ -2,6 +2,7 @@ import userRepository from '../repositories/user.repository';
 import { User, Role } from '@prisma/client';
 import { hashPassword } from '../utils/bcrypt.util';
 import { PaginationOptions, FilterOptions } from '../repositories/base.repository';
+import { AppError } from '../utils/AppError';
 
 /**
  * User Service
@@ -56,7 +57,7 @@ export const createUser = async (userData: {
   // Check if email already exists
   const existingUser = await userRepository.findByEmail(userData.email);
   if (existingUser) {
-    throw new Error('Email already exists');
+    throw new AppError('Email already exists', 409);
   }
 
   // Hash password
@@ -95,14 +96,14 @@ export const updateUser = async (
   // Check if user exists
   const existingUser = await userRepository.findById(id);
   if (!existingUser) {
-    throw new Error('User not found');
+    throw new AppError('User not found', 404);
   }
 
   // If email is being updated, check for duplicates
   if (userData.email && userData.email !== existingUser.email) {
     const emailExists = await userRepository.emailExists(userData.email, id);
     if (emailExists) {
-      throw new Error('Email already exists');
+      throw new AppError('Email already exists', 409);
     }
   }
 
@@ -135,7 +136,7 @@ export const deleteUser = async (id: string): Promise<Omit<User, 'passwordHash'>
   // Check if user exists
   const existingUser = await userRepository.findById(id);
   if (!existingUser) {
-    throw new Error('User not found');
+    throw new AppError('User not found', 404);
   }
 
   // Soft delete user
@@ -153,4 +154,17 @@ export const deleteUser = async (id: string): Promise<Omit<User, 'passwordHash'>
  */
 export const updateLastLogin = async (userId: string): Promise<User> => {
   return userRepository.updateLastLogin(userId);
+};
+
+/**
+ * Restore soft-deleted user
+ */
+export const restoreUser = async (id: string): Promise<Omit<User, 'passwordHash'>> => {
+  const exists = await userRepository.findByIdIncludingDeleted(id);
+  if (!exists) {
+    throw new AppError('User not found', 404);
+  }
+  const user = await userRepository.restore(id);
+  const { passwordHash: _, ...rest } = user;
+  return rest;
 };

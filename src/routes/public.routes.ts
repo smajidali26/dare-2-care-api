@@ -9,6 +9,7 @@ import { ImageController } from '../controllers/image.controller';
 import { ContactRepository } from '../repositories/contact.repository';
 import { ContactService } from '../services/contact.service';
 import { ContactController } from '../controllers/contact.controller';
+import { NotificationRepository } from '../repositories/notification.repository';
 import { SubscriberController } from '../controllers/subscriber.controller';
 import { validate } from '../middleware/validate.middleware';
 import { eventFiltersSchema, eventSlugSchema } from '../validators/event.validator';
@@ -42,7 +43,8 @@ const imageService = new ImageService(imageRepository);
 const imageController = new ImageController(imageService);
 
 const contactRepository = new ContactRepository(prisma);
-const contactService = new ContactService(contactRepository);
+const notificationRepository = new NotificationRepository(prisma);
+const contactService = new ContactService(contactRepository, notificationRepository);
 const contactController = new ContactController(contactService);
 
 const pageRepository = new PageRepository();

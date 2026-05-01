@@ -39,4 +39,10 @@ export class PageController {
     }
     res.json({ success: true, data: page });
   });
+
+  delete = asyncHandler(async (req: Request, res: Response) => {
+    const slug = getParamAsString(req.params.slug);
+    await this.pageService.deletePage(slug);
+    res.json({ success: true, message: 'Page deleted successfully' });
+  });
 }

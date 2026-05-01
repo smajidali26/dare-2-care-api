@@ -1,6 +1,7 @@
 import subscriberRepository from '../repositories/subscriber.repository';
 import { Subscriber, Prisma } from '@prisma/client';
 import { PaginationOptions, FilterOptions } from '../repositories/base.repository';
+import { AppError } from '../utils/AppError';
 
 /**
  * Subscriber Service
@@ -67,13 +68,13 @@ export const createSubscriber = async (subscriberData: {
   // Check if email already exists
   const existingSubscriber = await subscriberRepository.findByEmail(subscriberData.email);
   if (existingSubscriber) {
-    throw new Error('Email already exists');
+    throw new AppError('Email already exists', 409);
   }
 
   // Validate payment day
   const paymentDay = subscriberData.paymentDayOfMonth || 1;
   if (paymentDay < 1 || paymentDay > 28) {
-    throw new Error('Payment day must be between 1 and 28');
+    throw new AppError('Payment day must be between 1 and 28', 400);
   }
 
   // Create subscriber
@@ -129,21 +130,21 @@ export const updateSubscriber = async (
   // Check if subscriber exists
   const existingSubscriber = await subscriberRepository.findById(id);
   if (!existingSubscriber) {
-    throw new Error('Subscriber not found');
+    throw new AppError('Subscriber not found', 404);
   }
 
   // If email is being updated, check for duplicates
   if (subscriberData.email && subscriberData.email !== existingSubscriber.email) {
     const emailExists = await subscriberRepository.emailExists(subscriberData.email, id);
     if (emailExists) {
-      throw new Error('Email already exists');
+      throw new AppError('Email already exists', 409);
     }
   }
 
   // Validate payment day if provided
   if (subscriberData.paymentDayOfMonth !== undefined) {
     if (subscriberData.paymentDayOfMonth < 1 || subscriberData.paymentDayOfMonth > 28) {
-      throw new Error('Payment day must be between 1 and 28');
+      throw new AppError('Payment day must be between 1 and 28', 400);
     }
   }
 
@@ -166,7 +167,7 @@ export const deleteSubscriber = async (id: string): Promise<Subscriber> => {
   // Check if subscriber exists
   const existingSubscriber = await subscriberRepository.findById(id);
   if (!existingSubscriber) {
-    throw new Error('Subscriber not found');
+    throw new AppError('Subscriber not found', 404);
   }
 
   // Soft delete subscriber
@@ -188,4 +189,15 @@ export const getActiveSubscribers = async (pagination: PaginationOptions = {}) =
  */
 export const getManagementMembers = async (): Promise<Subscriber[]> => {
   return subscriberRepository.findManagementMembers();
+};
+
+/**
+ * Restore soft-deleted subscriber
+ */
+export const restoreSubscriber = async (id: string): Promise<Subscriber> => {
+  const exists = await subscriberRepository.findByIdIncludingDeleted(id);
+  if (!exists) {
+    throw new AppError('Subscriber not found', 404);
+  }
+  return subscriberRepository.restore(id);
 };

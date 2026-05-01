@@ -121,4 +121,14 @@ export class StudentController {
       message: 'Student deleted successfully',
     });
   });
+
+  restore = asyncHandler(async (req: Request, res: Response) => {
+    const id = getParamAsString(req.params.id);
+    const student = await studentService.restoreStudent(id);
+    res.status(200).json({
+      success: true,
+      data: student,
+      message: 'Student restored successfully',
+    });
+  });
 }

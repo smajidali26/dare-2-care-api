@@ -113,4 +113,14 @@ export class TeacherController {
       message: 'Teacher deleted successfully',
     });
   });
+
+  restore = asyncHandler(async (req: Request, res: Response) => {
+    const id = getParamAsString(req.params.id);
+    const teacher = await teacherService.restoreTeacher(id);
+    res.status(200).json({
+      success: true,
+      data: teacher,
+      message: 'Teacher restored successfully',
+    });
+  });
 }

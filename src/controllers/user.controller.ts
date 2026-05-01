@@ -107,4 +107,14 @@ export class UserController {
       message: 'User deleted successfully',
     });
   });
+
+  restore = asyncHandler(async (req: Request, res: Response) => {
+    const id = getParamAsString(req.params.id);
+    const user = await userService.restoreUser(id);
+    res.status(200).json({
+      success: true,
+      data: user,
+      message: 'User restored successfully',
+    });
+  });
 }

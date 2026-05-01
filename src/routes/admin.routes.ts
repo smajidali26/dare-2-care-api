@@ -43,7 +43,7 @@ import { contactFiltersSchema, contactIdSchema } from '../validators/contact.val
 import { NotificationRepository } from '../repositories/notification.repository';
 import { NotificationService } from '../services/notification.service';
 import { NotificationController } from '../controllers/notification.controller';
-import { notificationFiltersSchema, notificationIdSchema } from '../validators/notification.validator';
+import { notificationFiltersSchema, notificationIdSchema, broadcastNotificationSchema } from '../validators/notification.validator';
 import { PageRepository } from '../repositories/page.repository';
 import { PageService } from '../services/page.service';
 import { PageController } from '../controllers/page.controller';
@@ -52,6 +52,30 @@ import { SettingRepository } from '../repositories/setting.repository';
 import { SettingService } from '../services/setting.service';
 import { SettingController } from '../controllers/setting.controller';
 import { upsertSettingSchema, settingKeySchema, settingQuerySchema } from '../validators/setting.validator';
+import {
+  createUserSchema,
+  updateUserSchema,
+  userIdSchema,
+  userQuerySchema,
+} from '../validators/user.validator';
+import {
+  createSubscriberSchema,
+  updateSubscriberSchema,
+  subscriberIdSchema,
+  subscriberQuerySchema,
+} from '../validators/subscriber.validator';
+import {
+  createStudentSchema,
+  updateStudentSchema,
+  studentIdSchema,
+  studentQuerySchema,
+} from '../validators/student.validator';
+import {
+  createTeacherSchema,
+  updateTeacherSchema,
+  teacherIdSchema,
+  teacherQuerySchema,
+} from '../validators/teacher.validator';
 import { generalRateLimiter } from '../middleware/rateLimit.middleware';
 
 /**
@@ -89,18 +113,18 @@ const imageService = new ImageService(imageRepository);
 const imageController = new ImageController(imageService);
 
 /**
- * Initialize Contact Services
- */
-const contactRepository = new ContactRepository(prisma);
-const contactService = new ContactService(contactRepository);
-const contactController = new ContactController(contactService);
-
-/**
- * Initialize Notification Services
+ * Initialize Notification Services (notificationRepository is also used by ContactService)
  */
 const notificationRepository = new NotificationRepository(prisma);
 const notificationService = new NotificationService(notificationRepository);
 const notificationController = new NotificationController(notificationService);
+
+/**
+ * Initialize Contact Services
+ */
+const contactRepository = new ContactRepository(prisma);
+const contactService = new ContactService(contactRepository, notificationRepository);
+const contactController = new ContactController(contactService);
 
 /**
  * Initialize Page Services
@@ -129,62 +153,77 @@ router.get('/stats', statsController.getStats);
 router.get(
   '/users',
   requireRole(['SUPER_ADMIN', 'ADMIN']),
+  validate(userQuerySchema),
   userController.list
 );
 
 router.get(
   '/users/:id',
   requireRole(['SUPER_ADMIN', 'ADMIN']),
+  validate(userIdSchema),
   userController.get
 );
 
 router.post(
   '/users',
   requireRole(['SUPER_ADMIN']),
+  validate(createUserSchema),
   userController.create
 );
 
 router.put(
   '/users/:id',
   requireRole(['SUPER_ADMIN', 'ADMIN']),
+  validate(updateUserSchema),
   userController.update
 );
 
 router.delete(
   '/users/:id',
   requireRole(['SUPER_ADMIN']),
+  validate(userIdSchema),
   userController.delete
+);
+
+router.post(
+  '/users/:id/restore',
+  requireRole(['SUPER_ADMIN']),
+  validate(userIdSchema),
+  userController.restore
 );
 
 /**
  * Subscriber Management Routes
  * Accessible to all authenticated admin users
  */
-router.get('/subscribers', subscriberController.list);
-router.get('/subscribers/:id', subscriberController.get);
-router.post('/subscribers', subscriberController.create);
-router.put('/subscribers/:id', subscriberController.update);
-router.delete('/subscribers/:id', subscriberController.delete);
+router.get('/subscribers', validate(subscriberQuerySchema), subscriberController.list);
+router.get('/subscribers/:id', validate(subscriberIdSchema), subscriberController.get);
+router.post('/subscribers', requireRole(['SUPER_ADMIN', 'ADMIN']), validate(createSubscriberSchema), subscriberController.create);
+router.put('/subscribers/:id', requireRole(['SUPER_ADMIN', 'ADMIN']), validate(updateSubscriberSchema), subscriberController.update);
+router.delete('/subscribers/:id', requireRole(['SUPER_ADMIN', 'ADMIN']), validate(subscriberIdSchema), subscriberController.delete);
+router.post('/subscribers/:id/restore', requireRole(['SUPER_ADMIN', 'ADMIN']), validate(subscriberIdSchema), subscriberController.restore);
 
 /**
  * Student Management Routes
  * Accessible to all authenticated admin users
  */
-router.get('/students', studentController.list);
-router.get('/students/:id', studentController.get);
-router.post('/students', studentController.create);
-router.put('/students/:id', studentController.update);
-router.delete('/students/:id', studentController.delete);
+router.get('/students', validate(studentQuerySchema), studentController.list);
+router.get('/students/:id', validate(studentIdSchema), studentController.get);
+router.post('/students', requireRole(['SUPER_ADMIN', 'ADMIN']), validate(createStudentSchema), studentController.create);
+router.put('/students/:id', requireRole(['SUPER_ADMIN', 'ADMIN']), validate(updateStudentSchema), studentController.update);
+router.delete('/students/:id', requireRole(['SUPER_ADMIN', 'ADMIN']), validate(studentIdSchema), studentController.delete);
+router.post('/students/:id/restore', requireRole(['SUPER_ADMIN', 'ADMIN']), validate(studentIdSchema), studentController.restore);
 
 /**
  * Teacher Management Routes
  * Accessible to all authenticated admin users
  */
-router.get('/teachers', teacherController.list);
-router.get('/teachers/:id', teacherController.get);
-router.post('/teachers', teacherController.create);
-router.put('/teachers/:id', teacherController.update);
-router.delete('/teachers/:id', teacherController.delete);
+router.get('/teachers', validate(teacherQuerySchema), teacherController.list);
+router.get('/teachers/:id', validate(teacherIdSchema), teacherController.get);
+router.post('/teachers', requireRole(['SUPER_ADMIN', 'ADMIN']), validate(createTeacherSchema), teacherController.create);
+router.put('/teachers/:id', requireRole(['SUPER_ADMIN', 'ADMIN']), validate(updateTeacherSchema), teacherController.update);
+router.delete('/teachers/:id', requireRole(['SUPER_ADMIN', 'ADMIN']), validate(teacherIdSchema), teacherController.delete);
+router.post('/teachers/:id/restore', requireRole(['SUPER_ADMIN', 'ADMIN']), validate(teacherIdSchema), teacherController.restore);
 
 /**
  * File Upload Routes
@@ -241,6 +280,11 @@ router.put('/events/:id/media/:mediaId', validate(eventIdSchema), validate(media
  * Accessible to all authenticated admin users
  */
 router.get('/images', validate(imageFiltersSchema), imageController.list);
+
+// Slider reorder must be registered before dynamic /:id routes so Express
+// doesn't match "slider" as an :id parameter.
+router.put('/images/slider/reorder', validate(reorderSliderImagesSchema), imageController.reorderSlider);
+
 router.get('/images/:id', validate(imageIdSchema), imageController.get);
 router.post('/images', validate(createImageSchema), imageController.create);
 router.put('/images/:id', validate(imageIdSchema), validate(updateImageSchema), imageController.update);
@@ -250,8 +294,7 @@ router.delete('/images/:id', validate(imageIdSchema), imageController.delete);
 router.put('/images/:id/publish', validate(imageIdSchema), imageController.publish);
 router.put('/images/:id/unpublish', validate(imageIdSchema), imageController.unpublish);
 
-// Slider image management (static route before dynamic :id routes)
-router.put('/images/slider/reorder', validate(reorderSliderImagesSchema), imageController.reorderSlider);
+// Slider membership toggles (specific to a single image)
 router.put('/images/:id/slider', validate(imageIdSchema), imageController.markAsSlider);
 router.delete('/images/:id/slider', validate(imageIdSchema), imageController.unmarkAsSlider);
 
@@ -269,6 +312,12 @@ router.put('/contacts/:id/replied', validate(contactIdSchema), contactController
  */
 router.get('/notifications', validate(notificationFiltersSchema), notificationController.list);
 router.get('/notifications/:id', validate(notificationIdSchema), notificationController.get);
+router.post(
+  '/notifications/send',
+  requireRole(['SUPER_ADMIN', 'ADMIN']),
+  validate(broadcastNotificationSchema),
+  notificationController.send
+);
 
 /**
  * Page/Content Management Routes (Admin)
@@ -278,6 +327,7 @@ router.get('/pages', pageController.list);
 router.post('/pages', validate(createPageSchema), pageController.create);
 router.get('/pages/:slug', validate(pageSlugSchema), pageController.getBySlug);
 router.put('/pages/:slug', validate(updatePageSchema), pageController.update);
+router.delete('/pages/:slug', validate(pageSlugSchema), pageController.delete);
 
 /**
  * System Settings Routes (Admin)

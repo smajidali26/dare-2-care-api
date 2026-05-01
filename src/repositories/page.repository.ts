@@ -32,7 +32,7 @@ export class PageRepository {
     });
   }
 
-  async upsertBySlug(
+  async updateBySlug(
     slug: string,
     data: {
       title: string;
@@ -41,20 +41,13 @@ export class PageRepository {
       isPublished?: boolean;
     }
   ): Promise<Page> {
-    return prisma.page.upsert({
+    return prisma.page.update({
       where: { slug },
-      update: {
+      data: {
         title: data.title,
         content: data.content,
         metaDescription: data.metaDescription,
         isPublished: data.isPublished,
-      },
-      create: {
-        slug,
-        title: data.title,
-        content: data.content,
-        metaDescription: data.metaDescription,
-        isPublished: data.isPublished ?? true,
       },
     });
   }
@@ -64,5 +57,9 @@ export class PageRepository {
     data: Partial<Omit<Page, 'id' | 'createdAt' | 'updatedAt'>>
   ): Promise<Page> {
     return prisma.page.update({ where: { id }, data });
+  }
+
+  async deleteBySlug(slug: string): Promise<Page> {
+    return prisma.page.delete({ where: { slug } });
   }
 }

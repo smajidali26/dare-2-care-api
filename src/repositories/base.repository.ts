@@ -92,6 +92,16 @@ export class BaseRepository<T> {
   }
 
   /**
+   * Find record by ID including soft-deleted records.
+   * Used for restore flows where the target is expected to be soft-deleted.
+   */
+  async findByIdIncludingDeleted(id: string): Promise<T | null> {
+    return this.model.findUnique({
+      where: { id },
+    });
+  }
+
+  /**
    * Create new record
    * @param data - Record data
    * @returns Created record

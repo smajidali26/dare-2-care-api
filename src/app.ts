@@ -14,17 +14,22 @@ const app: Application = express();
 
 /**
  * CORS Configuration
- * Allows requests from configured web and admin origins
+ * Allowed origins are sourced from CORS_ORIGINS (comma-separated) env var.
+ * Falls back to localhost dev origins so local startup is not blocked when the var is unset.
  */
-const allowedOrigins = [
-  'https://dare2care-admin.vercel.app',
-  'https://dare2care-web.vercel.app',
-  'https://admin.d2cajk.org',
-  'https://www.d2cajk.org',
-  'https://d2cajk.org',
-  'http://localhost:3000',
-  'http://localhost:3001',
-];
+const DEV_FALLBACK_ORIGINS = ['http://localhost:3000', 'http://localhost:3001'];
+
+const allowedOrigins = (process.env.CORS_ORIGINS ?? '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+if (allowedOrigins.length === 0) {
+  console.warn(
+    '[CORS] CORS_ORIGINS env var not set; falling back to dev origins (localhost:3000, localhost:3001)'
+  );
+  allowedOrigins.push(...DEV_FALLBACK_ORIGINS);
+}
 
 const corsOptions = {
   origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {

@@ -1,13 +1,14 @@
 /**
  * SMS Service
- * Handles SMS sending via Twilio
+ * Sends SMS via Twilio Messaging Service.
  *
- * Setup Instructions:
- * 1. Install Twilio: npm install twilio
- * 2. Add TWILIO_ACCOUNT_SID to .env
- * 3. Add TWILIO_AUTH_TOKEN to .env
- * 4. Add TWILIO_PHONE_NUMBER to .env (e.g., +1234567890)
+ * Required env:
+ *   TWILIO_ACCOUNT_SID
+ *   TWILIO_AUTH_TOKEN
+ *   TWILIO_MESSAGING_SERVICE_SID  (preferred) — or TWILIO_PHONE_NUMBER as fallback
  */
+
+import twilio, { Twilio } from 'twilio';
 
 interface SMSOptions {
   to: string;
@@ -15,92 +16,78 @@ interface SMSOptions {
 }
 
 export class SMSService {
-  private fromPhone: string;
+  private client: Twilio | null;
+  private messagingServiceSid: string | undefined;
+  private fromPhone: string | undefined;
   private isConfigured: boolean;
 
   constructor() {
-    this.fromPhone = process.env.TWILIO_PHONE_NUMBER || '';
+    const accountSid = process.env.TWILIO_ACCOUNT_SID;
+    const authToken = process.env.TWILIO_AUTH_TOKEN;
+    this.messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
+    this.fromPhone = process.env.TWILIO_PHONE_NUMBER;
+
     this.isConfigured = !!(
-      process.env.TWILIO_ACCOUNT_SID &&
-      process.env.TWILIO_AUTH_TOKEN &&
-      process.env.TWILIO_PHONE_NUMBER
+      accountSid &&
+      authToken &&
+      (this.messagingServiceSid || this.fromPhone)
     );
+
+    this.client = this.isConfigured ? twilio(accountSid, authToken) : null;
   }
 
   /**
-   * Send SMS
+   * Send SMS via Twilio. Returns success: false with diagnostic message on any failure.
    */
   async send(options: SMSOptions): Promise<{ id: string; success: boolean; error?: string }> {
-    try {
-      // Check if SMS service is configured
-      if (!this.isConfigured) {
-        console.warn('SMS service not configured. SMS would be sent to:', options.to);
-        console.warn('Message:', options.message);
+    if (!this.isConfigured || !this.client) {
+      const error = 'SMS service not configured — TWILIO_* env vars missing';
+      console.warn(`[SMS] ${error} | to=${options.to}`);
+      return { id: '', success: false, error };
+    }
 
-        return {
-          id: `mock-sms-${Date.now()}`,
-          success: true,
-        };
+    try {
+      const params: { body: string; to: string; messagingServiceSid?: string; from?: string } = {
+        body: options.message,
+        to: options.to,
+      };
+      if (this.messagingServiceSid) {
+        params.messagingServiceSid = this.messagingServiceSid;
+      } else if (this.fromPhone) {
+        params.from = this.fromPhone;
       }
 
-      // TODO: Implement Twilio integration
-      // const twilio = require('twilio');
-      // const client = twilio(
-      //   process.env.TWILIO_ACCOUNT_SID,
-      //   process.env.TWILIO_AUTH_TOKEN
-      // );
-      //
-      // const result = await client.messages.create({
-      //   body: options.message,
-      //   from: this.fromPhone,
-      //   to: options.to,
-      // });
-      //
-      // return {
-      //   id: result.sid,
-      //   success: true,
-      // };
+      const result = await this.client.messages.create(params);
 
-      // Mock implementation for now
-      console.log('SMS sent (mock):', {
-        to: options.to,
-        message: options.message,
-      });
+      console.log(`[SMS] Sent | sid=${result.sid} | to=${options.to} | status=${result.status}`);
 
       return {
-        id: `mock-sms-${Date.now()}`,
+        id: result.sid,
         success: true,
       };
-    } catch (error: any) {
-      console.error('SMS send error:', error);
+    } catch (err: any) {
+      const error = err?.message || 'Twilio send failed';
+      console.error(`[SMS] Send failed | to=${options.to} | code=${err?.code} | message=${error}`);
       return {
         id: '',
         success: false,
-        error: error.message || 'Unknown error',
+        error,
       };
     }
   }
 
-  /**
-   * Send payment reminder SMS
-   */
   async sendPaymentReminder(data: {
     to: string;
     subscriberName: string;
     amount: number;
     paymentDay: number;
   }): Promise<{ id: string; success: boolean; error?: string }> {
-    const message = this.getPaymentReminderMessage(data);
-
     return this.send({
       to: data.to,
-      message,
+      message: this.getPaymentReminderMessage(data),
     });
   }
 
-  /**
-   * Payment reminder SMS template
-   */
   private getPaymentReminderMessage(data: {
     subscriberName: string;
     amount: number;
@@ -110,9 +97,6 @@ export class SMSService {
     return `Hi ${data.subscriberName}, this is a reminder that your monthly donation of $${data.amount.toFixed(2)} to Dare2Care is due on the ${ordinalDay} of this month. Thank you for your support!`;
   }
 
-  /**
-   * Convert day number to ordinal (1st, 2nd, 3rd, etc.)
-   */
   private getOrdinalDay(day: number): string {
     const suffixes = ['th', 'st', 'nd', 'rd'];
     const value = day % 100;

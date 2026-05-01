@@ -34,14 +34,13 @@ export class EmailService {
    */
   async send(options: EmailOptions): Promise<{ id: string; success: boolean; error?: string }> {
     try {
-      // Fallback to console logging if Resend is not configured
       if (!this.isConfigured || !this.resend) {
-        console.warn('[EmailService] Not configured (RESEND_API_KEY missing). Email would be sent to:', options.to);
-        console.warn('[EmailService] Subject:', options.subject);
-
+        const error = 'Email service not configured — RESEND_API_KEY missing';
+        console.warn(`[EmailService] ${error} | to=${options.to} | subject="${options.subject}"`);
         return {
-          id: `mock-${Date.now()}`,
-          success: true,
+          id: '',
+          success: false,
+          error,
         };
       }
 
@@ -112,15 +111,20 @@ export class EmailService {
     subject: string;
     message: string;
   }): Promise<{ id: string; success: boolean; error?: string }> {
+    const safeName = this.escapeHtml(data.contactName);
+    const safeEmail = this.escapeHtml(data.contactEmail);
+    const safeSubject = this.escapeHtml(data.subject);
+    const safeMessage = this.escapeHtml(data.message);
+
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #333;">New Contact Form Submission</h2>
         <div style="background: #f5f5f5; padding: 20px; border-radius: 5px;">
-          <p><strong>Name:</strong> ${data.contactName}</p>
-          <p><strong>Email:</strong> ${data.contactEmail}</p>
-          <p><strong>Subject:</strong> ${data.subject}</p>
+          <p><strong>Name:</strong> ${safeName}</p>
+          <p><strong>Email:</strong> ${safeEmail}</p>
+          <p><strong>Subject:</strong> ${safeSubject}</p>
           <p><strong>Message:</strong></p>
-          <p style="white-space: pre-wrap;">${data.message}</p>
+          <p style="white-space: pre-wrap;">${safeMessage}</p>
         </div>
         <p style="margin-top: 20px; font-size: 12px; color: #666;">
           This is an automated notification from the Dare2Care website contact form.
@@ -133,6 +137,19 @@ export class EmailService {
       subject: `New Contact Form: ${data.subject}`,
       html,
     });
+  }
+
+  /**
+   * Escape HTML special characters to prevent injection when interpolating
+   * untrusted user input into email templates.
+   */
+  private escapeHtml(input: string): string {
+    return input
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
 
   /**

@@ -132,6 +132,16 @@ export class SubscriberController {
     });
   });
 
+  restore = asyncHandler(async (req: Request, res: Response) => {
+    const id = getParamAsString(req.params.id);
+    const subscriber = await subscriberService.restoreSubscriber(id);
+    res.status(200).json({
+      success: true,
+      data: subscriber,
+      message: 'Subscriber restored successfully',
+    });
+  });
+
   /**
    * GET /api/public/management
    * Get management members (public endpoint)

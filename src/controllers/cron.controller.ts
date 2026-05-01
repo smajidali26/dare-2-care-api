@@ -27,16 +27,24 @@ export class CronController {
       throw new AppError('Unauthorized', 401);
     }
 
-    // Get all active subscribers
+    // Cron runs daily; only remind subscribers whose preferred day matches today
+    const dayOfMonth = new Date().getUTCDate();
+
     const subscribers = await this.prisma.subscriber.findMany({
       where: {
         isActive: true,
         isDeleted: false,
+        paymentDayOfMonth: dayOfMonth,
       },
     });
 
+    console.log(
+      `[Cron] Payment reminders for day ${dayOfMonth}: ${subscribers.length} subscriber(s)`
+    );
+
     const results = {
       total: subscribers.length,
+      dayOfMonth,
       sent: 0,
       failed: 0,
       skipped: 0,
