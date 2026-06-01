@@ -55,7 +55,14 @@ export class EventController {
    * Create new event
    */
   create = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
-    const event = await this.eventService.createEvent(req.body);
+    // Convert date strings to Date objects (the validate() middleware discards
+    // Zod's transformed output, so req.body.eventDate is still a string here).
+    const eventData: any = { ...req.body };
+    if (req.body.eventDate) {
+      eventData.eventDate = new Date(req.body.eventDate);
+    }
+
+    const event = await this.eventService.createEvent(eventData);
 
     res.status(201).json({
       success: true,
@@ -70,7 +77,15 @@ export class EventController {
    */
   update = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     const id = getParamAsString(req.params.id);
-    const event = await this.eventService.updateEvent(id, req.body);
+
+    // Convert date strings to Date objects (the validate() middleware discards
+    // Zod's transformed output, so req.body.eventDate is still a string here).
+    const eventData: any = { ...req.body };
+    if (req.body.eventDate) {
+      eventData.eventDate = new Date(req.body.eventDate);
+    }
+
+    const event = await this.eventService.updateEvent(id, eventData);
 
     res.json({
       success: true,
