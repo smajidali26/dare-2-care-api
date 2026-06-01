@@ -46,6 +46,7 @@ model Subscriber {
   updatedAt             DateTime          @updatedAt @map("updated_at")
   isDeleted             Boolean           @default(false) @map("is_deleted")
   notificationLogs      NotificationLog[]
+  donations             Donation[]
 
   @@map("subscribers")
 }
@@ -186,6 +187,7 @@ enum Role {
   SUPER_ADMIN
   ADMIN
   CONTENT_MANAGER
+  TREASURER
 }
 
 enum NotificationType {
@@ -225,6 +227,22 @@ enum PaymentType {
   CHARITY
 }
 
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  CARD
+  WALLET
+  CHEQUE
+  STRIPE
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
 model Page {
   id              String   @id @default(uuid())
   slug            String   @unique
@@ -236,4 +254,33 @@ model Page {
   updatedAt       DateTime @updatedAt @map("updated_at")
 
   @@map("pages")
+}
+
+/// A donation/payment actually received (manual entry or via Stripe).
+/// Append-only ledger semantics: corrections are made via refund/adjustment
+/// rows and status transitions, not by editing the amount of an existing row.
+model Donation {
+  id                    String        @id @default(uuid())
+  amount                Decimal       @db.Decimal(12, 2) // PKR
+  currency              String        @default("PKR")
+  paymentType           PaymentType   @default(DONATION) @map("payment_type")
+  method                PaymentMethod @default(CASH)
+  status                PaymentStatus @default(PENDING)
+  donorId               String?       @map("donor_id")
+  donorName             String?       @map("donor_name")
+  donorEmail            String?       @map("donor_email")
+  note                  String?
+  receivedAt            DateTime      @default(now()) @map("received_at")
+  stripePaymentIntentId String?       @unique @map("stripe_payment_intent_id")
+  stripeChargeId        String?       @map("stripe_charge_id")
+  recordedByUserId      String?       @map("recorded_by_user_id")
+  createdAt             DateTime      @default(now()) @map("created_at")
+  updatedAt             DateTime      @updatedAt @map("updated_at")
+  isDeleted             Boolean       @default(false) @map("is_deleted")
+  donor                 Subscriber?   @relation(fields: [donorId], references: [id])
+
+  @@index([donorId])
+  @@index([status])
+  @@index([receivedAt])
+  @@map("donations")
 }
