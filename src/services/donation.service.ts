@@ -1,6 +1,8 @@
 import { Donation, Prisma } from '@prisma/client';
 import { DonationRepository, DonationFilters, DonationSummary } from '../repositories/donation.repository';
 import { AppError } from '../utils/AppError';
+import { PaymentGateway } from './payment/gateway';
+import { StripeGateway } from './payment/stripe.gateway';
 
 /**
  * Donation Service
@@ -25,7 +27,10 @@ export interface RecordDonationInput {
 }
 
 export class DonationService {
-  constructor(private donationRepository: DonationRepository) {}
+  constructor(
+    private donationRepository: DonationRepository,
+    private gateway: PaymentGateway = new StripeGateway()
+  ) {}
 
   async list(filters: DonationFilters) {
     return this.donationRepository.findAllFiltered(filters);
@@ -91,5 +96,67 @@ export class DonationService {
 
   async summary(): Promise<DonationSummary> {
     return this.donationRepository.summary();
+  }
+
+  /**
+   * Create a gateway PaymentIntent and a PENDING donation linked to it.
+   * The donation is flipped to COMPLETED by the webhook on success.
+   */
+  async createDonationIntent(input: {
+    amount: number | string;
+    paymentType?: 'DONATION' | 'ZAKAT' | 'MEMBER_FEE' | 'CHARITY';
+    donorName?: string | null;
+    donorEmail?: string | null;
+    note?: string | null;
+  }): Promise<{ clientSecret: string; donationId: string }> {
+    const amount = Number(input.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new AppError('Amount must be a positive number', 400);
+    }
+
+    const { clientSecret, paymentIntentId } = await this.gateway.createPaymentIntent({
+      amountMinor: Math.round(amount * 100),
+      currency: 'pkr',
+      description: 'Dare2Care donation',
+      metadata: { paymentType: input.paymentType || 'DONATION' },
+    });
+
+    const donation = await this.donationRepository.create({
+      amount: new Prisma.Decimal(amount),
+      currency: 'PKR',
+      paymentType: input.paymentType || 'DONATION',
+      method: 'STRIPE',
+      status: 'PENDING',
+      donorName: input.donorName ?? undefined,
+      donorEmail: input.donorEmail ?? undefined,
+      note: input.note ?? undefined,
+      stripePaymentIntentId: paymentIntentId,
+    });
+
+    return { clientSecret, donationId: donation.id };
+  }
+
+  /**
+   * Process a verified gateway webhook. Idempotent by payment-intent id.
+   */
+  async handleStripeWebhook(rawBody: Buffer, signature: string): Promise<{ received: boolean }> {
+    const event = this.gateway.constructWebhookEvent(rawBody, signature);
+
+    if (event.paymentIntentId) {
+      const donation = await this.donationRepository.findByStripePaymentIntentId(event.paymentIntentId);
+      if (donation) {
+        if (event.type === 'payment_intent.succeeded' && donation.status !== 'COMPLETED') {
+          await this.donationRepository.update(donation.id, {
+            status: 'COMPLETED',
+            stripeChargeId: event.chargeId,
+            receivedAt: new Date(),
+          });
+        } else if (event.type === 'payment_intent.payment_failed' && donation.status === 'PENDING') {
+          await this.donationRepository.update(donation.id, { status: 'FAILED' });
+        }
+      }
+    }
+
+    return { received: true };
   }
 }

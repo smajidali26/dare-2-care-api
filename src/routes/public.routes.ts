@@ -20,6 +20,10 @@ import { PageService } from '../services/page.service';
 import { PageController } from '../controllers/page.controller';
 import { pageSlugSchema } from '../validators/page.validator';
 import { generalRateLimiter, contactRateLimiter } from '../middleware/rateLimit.middleware';
+import { DonationRepository } from '../repositories/donation.repository';
+import { DonationService } from '../services/donation.service';
+import { DonationController } from '../controllers/donation.controller';
+import { donationIntentSchema } from '../validators/donation.validator';
 
 /**
  * Public Routes
@@ -53,6 +57,8 @@ const pageController = new PageController(pageService);
 
 const subscriberController = new SubscriberController();
 
+const donationController = new DonationController(new DonationService(new DonationRepository(prisma)));
+
 /**
  * Event Routes
  */
@@ -85,5 +91,11 @@ router.get('/management', subscriberController.getManagementMembers);
  */
 // Get published page by slug
 router.get('/pages/:slug', validate(pageSlugSchema), pageController.getPublished);
+
+/**
+ * Donation Routes
+ */
+// Create a payment intent for an online donation (Stripe)
+router.post('/donations/intent', validate(donationIntentSchema), donationController.createIntent);
 
 export default router;
