@@ -75,4 +75,30 @@ export class DonationController {
     const data = await this.donationService.summary();
     res.json({ success: true, data });
   });
+
+  /**
+   * POST /api/public/donations/intent
+   * Create a payment intent for an online donation (returns clientSecret).
+   */
+  createIntent = asyncHandler(async (req: Request, res: Response) => {
+    const { amount, paymentType, donorName, donorEmail, note } = req.body;
+    const result = await this.donationService.createDonationIntent({
+      amount,
+      paymentType,
+      donorName,
+      donorEmail,
+      note,
+    });
+    res.status(201).json({ success: true, data: result });
+  });
+
+  /**
+   * POST /api/stripe/webhook
+   * Verified Stripe webhook (raw body). Marks donations completed/failed.
+   */
+  webhook = asyncHandler(async (req: Request, res: Response) => {
+    const signature = (req.headers['stripe-signature'] as string) || '';
+    const result = await this.donationService.handleStripeWebhook(req.body as Buffer, signature);
+    res.json({ success: true, ...result });
+  });
 }

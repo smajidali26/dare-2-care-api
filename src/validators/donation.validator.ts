@@ -53,3 +53,15 @@ export const donationIdSchema = z.object({
     id: z.string().uuid('Invalid donation ID format'),
   }),
 });
+
+export const donationIntentSchema = z.object({
+  body: z.object({
+    amount: z.coerce
+      .number({ invalid_type_error: 'Amount must be a number' })
+      .positive('Amount must be greater than 0'),
+    paymentType: paymentTypeEnum.optional(),
+    donorName: z.string().min(1).max(200).optional(),
+    donorEmail: z.string().email('Invalid email').optional(),
+    note: z.string().max(1000).optional(),
+  }),
+});
