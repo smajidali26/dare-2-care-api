@@ -52,6 +52,10 @@ import { SettingRepository } from '../repositories/setting.repository';
 import { SettingService } from '../services/setting.service';
 import { SettingController } from '../controllers/setting.controller';
 import { upsertSettingSchema, settingKeySchema, settingQuerySchema } from '../validators/setting.validator';
+import { DonationRepository } from '../repositories/donation.repository';
+import { DonationService } from '../services/donation.service';
+import { DonationController } from '../controllers/donation.controller';
+import { createDonationSchema, donationFiltersSchema, donationIdSchema } from '../validators/donation.validator';
 import {
   createUserSchema,
   updateUserSchema,
@@ -139,6 +143,13 @@ const pageController = new PageController(pageService);
 const settingRepository = new SettingRepository();
 const settingService = new SettingService(settingRepository);
 const settingController = new SettingController(settingService);
+
+/**
+ * Initialize Donation (Finance) Services
+ */
+const donationRepository = new DonationRepository(prisma);
+const donationService = new DonationService(donationRepository);
+const donationController = new DonationController(donationService);
 
 /**
  * Dashboard Stats Route
@@ -337,5 +348,20 @@ router.get('/settings', requireRole(['SUPER_ADMIN']), validate(settingQuerySchem
 router.get('/settings/:key', requireRole(['SUPER_ADMIN']), validate(settingKeySchema), settingController.get);
 router.post('/settings', requireRole(['SUPER_ADMIN']), validate(upsertSettingSchema), settingController.upsert);
 router.delete('/settings/:key', requireRole(['SUPER_ADMIN']), validate(settingKeySchema), settingController.delete);
+
+/**
+ * Finance / Donation Management Routes (Admin)
+ * Financial data is sensitive: reads are limited to SUPER_ADMIN / ADMIN / TREASURER,
+ * and writes (record / refund / delete) to SUPER_ADMIN / TREASURER.
+ */
+const FINANCE_READ = ['SUPER_ADMIN', 'ADMIN', 'TREASURER'];
+const FINANCE_WRITE = ['SUPER_ADMIN', 'TREASURER'];
+
+router.get('/finance/summary', requireRole(FINANCE_READ), donationController.summary);
+router.get('/finance/donations', requireRole(FINANCE_READ), validate(donationFiltersSchema), donationController.list);
+router.get('/finance/donations/:id', requireRole(FINANCE_READ), validate(donationIdSchema), donationController.get);
+router.post('/finance/donations', requireRole(FINANCE_WRITE), validate(createDonationSchema), donationController.create);
+router.put('/finance/donations/:id/refund', requireRole(FINANCE_WRITE), validate(donationIdSchema), donationController.refund);
+router.delete('/finance/donations/:id', requireRole(FINANCE_WRITE), validate(donationIdSchema), donationController.delete);
 
 export default router;
