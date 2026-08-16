@@ -50,8 +50,11 @@ export const authenticateToken = async (
       throw new ApiError(401, 'Account is inactive');
     }
 
-    // Attach user to request
-    req.user = payload;
+    // Attach user to request: identity (userId) comes from the verified token,
+    // but authority (role) is always taken from the DB row we just loaded —
+    // not the JWT claim, which can be stale for up to the token's TTL after a
+    // role change. `email` is likewise sourced from the DB for consistency.
+    req.user = { userId: payload.userId, email: user.email, role: user.role };
 
     next();
   } catch (error) {

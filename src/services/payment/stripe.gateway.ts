@@ -6,6 +6,7 @@ import {
   GatewayWebhookEvent,
 } from './gateway';
 import { AppError } from '../../utils/AppError';
+import { env } from '../../config/env.config';
 
 /**
  * Stripe implementation of PaymentGateway.
@@ -20,8 +21,8 @@ export class StripeGateway implements PaymentGateway {
   readonly isConfigured: boolean;
 
   constructor() {
-    const apiKey = process.env.STRIPE_SECRET_KEY;
-    this.webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+    const apiKey = env.STRIPE_SECRET_KEY;
+    this.webhookSecret = env.STRIPE_WEBHOOK_SECRET;
     this.isConfigured = !!apiKey;
     this.stripe = apiKey ? new Stripe(apiKey) : null;
   }

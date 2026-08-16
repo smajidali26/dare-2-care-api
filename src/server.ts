@@ -1,11 +1,12 @@
-import dotenv from 'dotenv';
+/**
+ * Load and validate environment variables FIRST — before app.ts (and, transitively,
+ * routes/services/DB) are imported — so a missing/invalid var fails loudly and exits
+ * before anything binds a port. See src/config/env.config.ts.
+ */
+import './config/env.config';
+
 import app from './app';
 import { disconnectDatabase } from './config/database.config';
-
-/**
- * Load environment variables from .env file
- */
-dotenv.config();
 
 /**
  * Server Configuration

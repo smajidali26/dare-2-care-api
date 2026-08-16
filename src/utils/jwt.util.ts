@@ -1,4 +1,5 @@
 import jwt, { SignOptions } from 'jsonwebtoken';
+import { env } from '../config/env.config';
 
 /**
  * JWT Utilities
@@ -21,14 +22,9 @@ export const generateToken = (
   payload: TokenPayload,
   expiresIn?: string
 ): string => {
-  const secret = process.env.JWT_SECRET;
-  if (!secret) {
-    throw new Error('JWT_SECRET is not defined in environment variables');
-  }
+  const expiry = expiresIn || env.JWT_EXPIRES_IN || '1h';
 
-  const expiry = expiresIn || process.env.JWT_EXPIRES_IN || '1h';
-
-  return jwt.sign(payload, secret, { expiresIn: expiry } as SignOptions);
+  return jwt.sign(payload, env.JWT_SECRET, { expiresIn: expiry } as SignOptions);
 };
 
 /**
@@ -37,14 +33,9 @@ export const generateToken = (
  * @returns Signed refresh token
  */
 export const generateRefreshToken = (payload: TokenPayload): string => {
-  const secret = process.env.JWT_REFRESH_SECRET;
-  if (!secret) {
-    throw new Error('JWT_REFRESH_SECRET is not defined in environment variables');
-  }
+  const expiresIn = env.JWT_REFRESH_EXPIRES_IN || '7d';
 
-  const expiresIn = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
-
-  return jwt.sign(payload, secret, { expiresIn } as SignOptions);
+  return jwt.sign(payload, env.JWT_REFRESH_SECRET, { expiresIn } as SignOptions);
 };
 
 /**
@@ -54,12 +45,7 @@ export const generateRefreshToken = (payload: TokenPayload): string => {
  * @throws Error if token is invalid or expired
  */
 export const verifyToken = (token: string): TokenPayload => {
-  const secret = process.env.JWT_SECRET;
-  if (!secret) {
-    throw new Error('JWT_SECRET is not defined in environment variables');
-  }
-
-  return jwt.verify(token, secret) as TokenPayload;
+  return jwt.verify(token, env.JWT_SECRET) as TokenPayload;
 };
 
 /**
@@ -69,10 +55,5 @@ export const verifyToken = (token: string): TokenPayload => {
  * @throws Error if token is invalid or expired
  */
 export const verifyRefreshToken = (token: string): TokenPayload => {
-  const secret = process.env.JWT_REFRESH_SECRET;
-  if (!secret) {
-    throw new Error('JWT_REFRESH_SECRET is not defined in environment variables');
-  }
-
-  return jwt.verify(token, secret) as TokenPayload;
+  return jwt.verify(token, env.JWT_REFRESH_SECRET) as TokenPayload;
 };

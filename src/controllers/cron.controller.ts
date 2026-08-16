@@ -2,7 +2,6 @@ import { Request, Response, NextFunction } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { NotificationService } from '../services/notification.service';
 import { asyncHandler } from '../utils/asyncHandler';
-import { AppError } from '../utils/AppError';
 
 /**
  * Cron Controller
@@ -17,16 +16,9 @@ export class CronController {
   /**
    * GET /api/cron/payment-reminders
    * Send monthly payment reminders to all active subscribers
-   * Protected by Vercel Cron authentication (Authorization: Bearer <CRON_SECRET>)
+   * Protected by the `requireCronSecret` middleware (router.use in cron.routes.ts)
    */
   sendMonthlyReminders = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
-    // Verify Vercel Cron secret
-    const authHeader = req.headers['authorization'];
-    const expectedAuth = `Bearer ${process.env.CRON_SECRET}`;
-    if (authHeader !== expectedAuth) {
-      throw new AppError('Unauthorized', 401);
-    }
-
     // Cron runs daily; only remind subscribers whose preferred day matches today
     const dayOfMonth = new Date().getUTCDate();
 
@@ -112,16 +104,9 @@ export class CronController {
   /**
    * GET /api/cron/health
    * Health check for cron jobs
-   * Protected by Vercel Cron authentication (Authorization: Bearer <CRON_SECRET>)
+   * Protected by the `requireCronSecret` middleware (router.use in cron.routes.ts)
    */
   healthCheck = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
-    // Verify Vercel Cron secret
-    const authHeader = req.headers['authorization'];
-    const expectedAuth = `Bearer ${process.env.CRON_SECRET}`;
-    if (authHeader !== expectedAuth) {
-      throw new AppError('Unauthorized', 401);
-    }
-
     res.json({
       success: true,
       message: 'Cron service is healthy',

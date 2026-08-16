@@ -3,6 +3,7 @@ import prisma from '../config/database.config';
 import { NotificationRepository } from '../repositories/notification.repository';
 import { NotificationService } from '../services/notification.service';
 import { CronController } from '../controllers/cron.controller';
+import { requireCronSecret } from '../middleware/cronAuth.middleware';
 
 /**
  * Cron Routes
@@ -18,6 +19,11 @@ const router = Router();
 const notificationRepository = new NotificationRepository(prisma);
 const notificationService = new NotificationService(notificationRepository);
 const cronController = new CronController(prisma, notificationService);
+
+/**
+ * Applies to every route in this router, current and future.
+ */
+router.use(requireCronSecret);
 
 /**
  * Cron Job Endpoints
