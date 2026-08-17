@@ -1,5 +1,5 @@
 import prisma from '../config/database.config';
-import { Student } from '@prisma/client';
+import { Student, Prisma } from '@prisma/client';
 import { BaseRepository, PaginationOptions, FilterOptions } from './base.repository';
 
 /**
@@ -63,6 +63,19 @@ class StudentRepository extends BaseRepository<Student> {
       limit,
       totalPages: Math.ceil(total / limit),
     };
+  }
+
+  /**
+   * Update student
+   * Overrides BaseRepository.update to accept the real Prisma update input
+   * type instead of the untyped Partial<T> the generic base uses — see
+   * DARE2CARE-56 / DARE2CARE-57.
+   * @param id - Student ID
+   * @param data - Update input
+   * @returns Updated student
+   */
+  async update(id: string, data: Prisma.StudentUpdateInput): Promise<Student> {
+    return prisma.student.update({ where: { id }, data });
   }
 
   /**

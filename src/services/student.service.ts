@@ -1,5 +1,5 @@
 import studentRepository from '../repositories/student.repository';
-import { Student } from '@prisma/client';
+import { Student, Prisma } from '@prisma/client';
 import { PaginationOptions, FilterOptions } from '../repositories/base.repository';
 import { AppError } from '../utils/AppError';
 
@@ -105,8 +105,25 @@ export const updateStudent = async (
     }
   }
 
+  // Explicit field-by-field reconstruction (defence in depth — do not forward
+  // the caller-supplied object verbatim; see DARE2CARE-56 / DARE2CARE-57).
+  // Undefined fields are left unchanged by Prisma, null fields are explicitly
+  // cleared.
+  const updateData: Prisma.StudentUpdateInput = {
+    fullName: studentData.fullName,
+    dateOfBirth: studentData.dateOfBirth,
+    gender: studentData.gender,
+    guardianName: studentData.guardianName,
+    guardianPhone: studentData.guardianPhone,
+    guardianEmail: studentData.guardianEmail,
+    schoolName: studentData.schoolName,
+    grade: studentData.grade,
+    enrollmentDate: studentData.enrollmentDate,
+    isActive: studentData.isActive,
+  };
+
   // Update student
-  return studentRepository.update(id, studentData);
+  return studentRepository.update(id, updateData);
 };
 
 /**
