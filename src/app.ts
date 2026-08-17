@@ -1,5 +1,6 @@
 import express, { Application } from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.middleware';
 import healthRoutes from './routes/health.routes';
@@ -49,6 +50,32 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
+
+/**
+ * Security Headers (DARE2CARE-22)
+ * Applied early — after CORS, before the body parsers and every route
+ * (including the Stripe webhook mount below). helmet() only sets response
+ * headers; it never reads or touches the request body, so it cannot
+ * interfere with the webhook's raw-body signature verification.
+ *
+ * `contentSecurityPolicy` is deliberately left OFF: this is a JSON API with
+ * no HTML responses, and a wrong CSP is worse than none — CSP is tracked as
+ * a separate, deliberate ticket. Every other helmet 8.x default is enabled:
+ *   - Strict-Transport-Security: max-age=31536000; includeSubDomains
+ *   - X-Content-Type-Options: nosniff
+ *   - X-Frame-Options: SAMEORIGIN
+ *   - Referrer-Policy: no-referrer
+ *   - Cross-Origin-Opener-Policy: same-origin
+ *   - Cross-Origin-Resource-Policy: same-origin
+ *   - Origin-Agent-Cluster: ?1
+ *   - X-DNS-Prefetch-Control: off
+ *   - X-Download-Options: noopen
+ *   - X-Permitted-Cross-Domain-Policies: none
+ *   - X-XSS-Protection: 0
+ *   - X-Powered-By header removed
+ * (Cross-Origin-Embedder-Policy is NOT one of helmet's defaults and stays off.)
+ */
+app.use(helmet({ contentSecurityPolicy: false }));
 
 /**
  * Stripe Webhook Routes

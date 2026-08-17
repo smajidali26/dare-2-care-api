@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { sanitizeNullableHtml } from '../utils/sanitizeHtml.util';
 
 /**
  * Subscriber Request Validators
@@ -42,7 +43,10 @@ const subscriberFields = {
   profileImageUrl: z.string().url('Invalid URL format').nullable(),
   isManagement: z.boolean(),
   managementRole: z.string().nullable(),
-  managementBio: z.string().nullable(),
+  // DARE2CARE-23 / ADR-0007: sanitise rich-text HTML at the write boundary.
+  // managementBio is nullable — sanitizeNullableHtml passes null through
+  // untouched rather than throwing or coercing it to ''.
+  managementBio: z.string().nullable().transform(sanitizeNullableHtml),
   displayOrder: z.number().int(),
 };
 

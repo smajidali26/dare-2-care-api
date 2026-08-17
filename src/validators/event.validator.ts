@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { sanitizeNullableHtml } from '../utils/sanitizeHtml.util';
 
 /**
  * Event Validators
@@ -20,7 +21,9 @@ export const createEventSchema = z.object({
       .max(500, 'Description must be less than 500 characters'),
     content: z
       .string()
-      .min(1, 'Content is required'),
+      .min(1, 'Content is required')
+      // DARE2CARE-23 / ADR-0007: sanitise rich-text HTML at the write boundary.
+      .transform(sanitizeNullableHtml),
     eventDate: z
       .string()
       .refine((val) => !isNaN(Date.parse(val)), {
@@ -57,7 +60,9 @@ export const updateEventSchema = z.object({
     content: z
       .string()
       .min(1, 'Content is required')
-      .optional(),
+      .optional()
+      // DARE2CARE-23 / ADR-0007: sanitise rich-text HTML at the write boundary.
+      .transform(sanitizeNullableHtml),
     eventDate: z
       .string()
       .refine((val) => !isNaN(Date.parse(val)), {

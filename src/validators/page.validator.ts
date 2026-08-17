@@ -1,9 +1,14 @@
 import { z } from 'zod';
+import { sanitizeNullableHtml } from '../utils/sanitizeHtml.util';
 
 export const updatePageSchema = z.object({
   body: z.object({
     title: z.string().min(1, 'Title is required').max(200),
-    content: z.string().min(1, 'Content is required'),
+    content: z
+      .string()
+      .min(1, 'Content is required')
+      // DARE2CARE-23 / ADR-0007: sanitise rich-text HTML at the write boundary.
+      .transform(sanitizeNullableHtml),
     metaDescription: z.string().max(160).optional().nullable(),
     isPublished: z.boolean().optional(),
   }),
@@ -21,7 +26,11 @@ export const createPageSchema = z.object({
       .max(200)
       .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Slug must be lowercase with hyphens only (e.g., "about-us")'),
     title: z.string().min(1, 'Title is required').max(200),
-    content: z.string().min(1, 'Content is required'),
+    content: z
+      .string()
+      .min(1, 'Content is required')
+      // DARE2CARE-23 / ADR-0007: sanitise rich-text HTML at the write boundary.
+      .transform(sanitizeNullableHtml),
     metaDescription: z.string().max(160).optional().nullable(),
     isPublished: z.boolean().optional(),
   }),
