@@ -57,3 +57,24 @@ export const contactRateLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
+
+/**
+ * Donation-intent rate limiter (DARE2CARE-9 §2.6)
+ * Allows 5 requests per 15 minutes per IP. `POST /api/public/donations/intent`
+ * was previously only covered by `generalRateLimiter` (100/15min) despite each
+ * call hitting the Stripe API and writing a PENDING donation row — 100 junk
+ * intents/rows per IP per window. A dedicated instance (not the shared
+ * `contactRateLimiter`) so the two surfaces can be tuned independently.
+ */
+export const donationIntentRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5,
+  message: {
+    success: false,
+    error: {
+      message: 'Too many donation attempts. Please try again after 15 minutes.',
+    },
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});

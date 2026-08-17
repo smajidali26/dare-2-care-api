@@ -23,8 +23,22 @@ export interface GatewayWebhookEvent {
   chargeId?: string;
 }
 
+export interface RefundParams {
+  paymentIntentId: string;
+}
+
+export interface RefundResult {
+  refundId: string;
+}
+
 export interface PaymentGateway {
   readonly isConfigured: boolean;
   createPaymentIntent(params: CreatePaymentIntentParams): Promise<CreatePaymentIntentResult>;
   constructWebhookEvent(rawBody: Buffer, signature: string): GatewayWebhookEvent;
+  /**
+   * Refund a captured payment at the gateway. Must be attempted for every
+   * Stripe-method donation refund — a ledger-only refund would let the books
+   * diverge from what Stripe actually holds (DARE2CARE-9 §2.2).
+   */
+  refund(params: RefundParams): Promise<RefundResult>;
 }

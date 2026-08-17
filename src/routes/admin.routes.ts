@@ -55,7 +55,18 @@ import { upsertSettingSchema, settingKeySchema, settingQuerySchema } from '../va
 import { DonationRepository } from '../repositories/donation.repository';
 import { DonationService } from '../services/donation.service';
 import { DonationController } from '../controllers/donation.controller';
-import { createDonationSchema, donationFiltersSchema, donationIdSchema } from '../validators/donation.validator';
+import {
+  createDonationSchema,
+  donationFiltersSchema,
+  donationIdSchema,
+  refundDonationSchema,
+  voidDonationSchema,
+  subscriberDonationsSchema,
+} from '../validators/donation.validator';
+import { ReconciliationRepository } from '../repositories/reconciliation.repository';
+import { ReconciliationService } from '../services/reconciliation.service';
+import { ReconciliationController } from '../controllers/reconciliation.controller';
+import { reconciliationQuerySchema } from '../validators/reconciliation.validator';
 import {
   createUserSchema,
   updateUserSchema,
@@ -152,6 +163,21 @@ const donationService = new DonationService(donationRepository);
 const donationController = new DonationController(donationService);
 
 /**
+ * Initialize Reconciliation Services (DARE2CARE-12)
+ */
+const reconciliationRepository = new ReconciliationRepository(prisma);
+const reconciliationService = new ReconciliationService(reconciliationRepository);
+const reconciliationController = new ReconciliationController(reconciliationService);
+
+/**
+ * Financial data is sensitive: reads are limited to SUPER_ADMIN / ADMIN / TREASURER,
+ * and writes (record / refund) to SUPER_ADMIN / TREASURER. Void is SUPER_ADMIN only (§2.5).
+ */
+const FINANCE_READ = ['SUPER_ADMIN', 'ADMIN', 'TREASURER'];
+const FINANCE_WRITE = ['SUPER_ADMIN', 'TREASURER'];
+const FINANCE_VOID = ['SUPER_ADMIN'];
+
+/**
  * Dashboard Stats Route
  * Accessible to all authenticated admin users
  */
@@ -213,6 +239,17 @@ router.post('/subscribers', requireRole(['SUPER_ADMIN', 'ADMIN']), validate(crea
 router.put('/subscribers/:id', requireRole(['SUPER_ADMIN', 'ADMIN']), validate(updateSubscriberSchema), subscriberController.update);
 router.delete('/subscribers/:id', requireRole(['SUPER_ADMIN', 'ADMIN']), validate(subscriberIdSchema), subscriberController.delete);
 router.post('/subscribers/:id/restore', requireRole(['SUPER_ADMIN', 'ADMIN']), validate(subscriberIdSchema), subscriberController.restore);
+
+/**
+ * Donation history for one supporter (DARE2CARE-9 §2.8 / DARE2CARE-11's backing endpoint).
+ * Financial data — same read-role set as the rest of finance.
+ */
+router.get(
+  '/subscribers/:id/donations',
+  requireRole(FINANCE_READ),
+  validate(subscriberDonationsSchema),
+  donationController.listBySubscriber
+);
 
 /**
  * Student Management Routes
@@ -351,17 +388,25 @@ router.delete('/settings/:key', requireRole(['SUPER_ADMIN']), validate(settingKe
 
 /**
  * Finance / Donation Management Routes (Admin)
- * Financial data is sensitive: reads are limited to SUPER_ADMIN / ADMIN / TREASURER,
- * and writes (record / refund / delete) to SUPER_ADMIN / TREASURER.
+ * (FINANCE_READ / FINANCE_WRITE / FINANCE_VOID declared above, near the donation
+ * service init, so they can also be reused by /subscribers/:id/donations.)
  */
-const FINANCE_READ = ['SUPER_ADMIN', 'ADMIN', 'TREASURER'];
-const FINANCE_WRITE = ['SUPER_ADMIN', 'TREASURER'];
-
 router.get('/finance/summary', requireRole(FINANCE_READ), donationController.summary);
 router.get('/finance/donations', requireRole(FINANCE_READ), validate(donationFiltersSchema), donationController.list);
 router.get('/finance/donations/:id', requireRole(FINANCE_READ), validate(donationIdSchema), donationController.get);
 router.post('/finance/donations', requireRole(FINANCE_WRITE), validate(createDonationSchema), donationController.create);
-router.put('/finance/donations/:id/refund', requireRole(FINANCE_WRITE), validate(donationIdSchema), donationController.refund);
-router.delete('/finance/donations/:id', requireRole(FINANCE_WRITE), validate(donationIdSchema), donationController.delete);
+router.put('/finance/donations/:id/refund', requireRole(FINANCE_WRITE), validate(refundDonationSchema), donationController.refund);
+// Void replaces the old DELETE route (§2.5) — money is void-only, never deleted. SUPER_ADMIN only.
+router.post('/finance/donations/:id/void', requireRole(FINANCE_VOID), validate(voidDonationSchema), donationController.void);
+
+/**
+ * Pledge-vs-received reconciliation (DARE2CARE-12)
+ */
+router.get(
+  '/finance/reconciliation',
+  requireRole(FINANCE_READ),
+  validate(reconciliationQuerySchema),
+  reconciliationController.get
+);
 
 export default router;

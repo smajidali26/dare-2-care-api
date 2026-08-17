@@ -4,6 +4,8 @@ import {
   CreatePaymentIntentParams,
   CreatePaymentIntentResult,
   GatewayWebhookEvent,
+  RefundParams,
+  RefundResult,
 } from './gateway';
 import { AppError } from '../../utils/AppError';
 import { env } from '../../config/env.config';
@@ -45,6 +47,24 @@ export class StripeGateway implements PaymentGateway {
     }
 
     return { clientSecret: intent.client_secret, paymentIntentId: intent.id };
+  }
+
+  /**
+   * Refund a payment at Stripe by PaymentIntent id. Throws (never silently
+   * returns success) on gateway failure so the caller leaves the ledger
+   * status unchanged — see DonationService.refund.
+   */
+  async refund(params: RefundParams): Promise<RefundResult> {
+    if (!this.stripe) {
+      throw new AppError('Online payments are not configured', 503);
+    }
+
+    try {
+      const refund = await this.stripe.refunds.create({ payment_intent: params.paymentIntentId });
+      return { refundId: refund.id };
+    } catch (err: any) {
+      throw new AppError(`Stripe refund failed: ${err.message}`, 502);
+    }
   }
 
   constructWebhookEvent(rawBody: Buffer, signature: string): GatewayWebhookEvent {

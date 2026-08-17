@@ -2,6 +2,7 @@ import { Router } from 'express';
 import prisma from '../config/database.config';
 import { NotificationRepository } from '../repositories/notification.repository';
 import { NotificationService } from '../services/notification.service';
+import { DonationRepository } from '../repositories/donation.repository';
 import { CronController } from '../controllers/cron.controller';
 import { requireCronSecret } from '../middleware/cronAuth.middleware';
 
@@ -18,7 +19,8 @@ const router = Router();
  */
 const notificationRepository = new NotificationRepository(prisma);
 const notificationService = new NotificationService(notificationRepository);
-const cronController = new CronController(prisma, notificationService);
+const donationRepository = new DonationRepository(prisma);
+const cronController = new CronController(prisma, notificationService, donationRepository);
 
 /**
  * Applies to every route in this router, current and future.

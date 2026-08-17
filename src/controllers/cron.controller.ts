@@ -1,7 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { NotificationService } from '../services/notification.service';
+import { DonationRepository } from '../repositories/donation.repository';
 import { asyncHandler } from '../utils/asyncHandler';
+import { currentUtcPeriod } from '../utils/period.util';
 
 /**
  * Cron Controller
@@ -10,19 +12,28 @@ import { asyncHandler } from '../utils/asyncHandler';
 export class CronController {
   constructor(
     private prisma: PrismaClient,
-    private notificationService: NotificationService
+    private notificationService: NotificationService,
+    private donationRepository: DonationRepository
   ) {}
 
   /**
    * GET /api/cron/payment-reminders
-   * Send monthly payment reminders to all active subscribers
+   * Send monthly payment reminders to all active subscribers whose preferred
+   * day matches today — UNLESS they already have a qualifying (COMPLETED,
+   * non-voided, non-deleted, donor-linked, this-period) donation on record
+   * (DARE2CARE-13). `PENDING` never suppresses: an abandoned Stripe checkout
+   * must not silence a real reminder (spec §0/§4).
    * Protected by the `requireCronSecret` middleware (router.use in cron.routes.ts)
    */
   sendMonthlyReminders = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
-    // Cron runs daily; only remind subscribers whose preferred day matches today
-    const dayOfMonth = new Date().getUTCDate();
+    // Cron runs daily; only remind subscribers whose preferred day matches today.
+    // `now` is captured once so the day-of-month and the UTC period it's
+    // matched against can never disagree at a month boundary.
+    const now = new Date();
+    const dayOfMonth = now.getUTCDate();
+    const period = currentUtcPeriod(now);
 
-    const subscribers = await this.prisma.subscriber.findMany({
+    const candidates = await this.prisma.subscriber.findMany({
       where: {
         isActive: true,
         isDeleted: false,
@@ -30,18 +41,36 @@ export class CronController {
       },
     });
 
+    // One query, not N+1: donor ids who already have a qualifying payment for this period.
+    const paidDonorIds = await this.donationRepository.findPaidDonorIdsForPeriod(period);
+
+    const suppressed = candidates.filter((s) => paidDonorIds.has(s.id));
+    const subscribers = candidates.filter((s) => !paidDonorIds.has(s.id));
+
     console.log(
-      `[Cron] Payment reminders for day ${dayOfMonth}: ${subscribers.length} subscriber(s)`
+      `[Cron] Payment reminders for day ${dayOfMonth} (period ${period}): ` +
+        `${candidates.length} candidate(s), ${suppressed.length} already paid, ${subscribers.length} to remind`
     );
 
     const results = {
-      total: subscribers.length,
+      total: candidates.length,
       dayOfMonth,
+      period,
       sent: 0,
       failed: 0,
       skipped: 0,
+      suppressed: suppressed.length,
       details: [] as any[],
     };
+
+    for (const subscriber of suppressed) {
+      results.details.push({
+        subscriberId: subscriber.id,
+        subscriberName: subscriber.fullName,
+        status: 'suppressed',
+        reason: `Already paid for period ${period}`,
+      });
+    }
 
     // Send reminders
     for (const subscriber of subscribers) {

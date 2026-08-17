@@ -19,7 +19,7 @@ import { PageRepository } from '../repositories/page.repository';
 import { PageService } from '../services/page.service';
 import { PageController } from '../controllers/page.controller';
 import { pageSlugSchema } from '../validators/page.validator';
-import { generalRateLimiter, contactRateLimiter } from '../middleware/rateLimit.middleware';
+import { generalRateLimiter, contactRateLimiter, donationIntentRateLimiter } from '../middleware/rateLimit.middleware';
 import { DonationRepository } from '../repositories/donation.repository';
 import { DonationService } from '../services/donation.service';
 import { DonationController } from '../controllers/donation.controller';
@@ -95,7 +95,12 @@ router.get('/pages/:slug', validate(pageSlugSchema), pageController.getPublished
 /**
  * Donation Routes
  */
-// Create a payment intent for an online donation (Stripe)
-router.post('/donations/intent', validate(donationIntentSchema), donationController.createIntent);
+// Create a payment intent for an online donation (Stripe) — stricter, dedicated rate limit (§2.6)
+router.post(
+  '/donations/intent',
+  donationIntentRateLimiter,
+  validate(donationIntentSchema),
+  donationController.createIntent
+);
 
 export default router;

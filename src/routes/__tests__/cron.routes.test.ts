@@ -13,7 +13,9 @@ import { errorHandler } from '../../middleware/errorHandler.middleware';
  * between tests is enough.
  *
  * `config/database.config` is mocked so the payment-reminders 200 case never
- * touches a real database — only `prisma.subscriber.findMany` is exercised.
+ * touches a real database — only `prisma.subscriber.findMany` and
+ * `prisma.donation.groupBy` (used by DonationRepository.findPaidDonorIdsForPeriod,
+ * DARE2CARE-13's suppression query) are exercised.
  */
 const mockEnv = vi.hoisted<{ CRON_SECRET?: string }>(() => ({}));
 
@@ -23,6 +25,9 @@ vi.mock('../../config/database.config', () => ({
   default: {
     subscriber: {
       findMany: vi.fn().mockResolvedValue([]),
+    },
+    donation: {
+      groupBy: vi.fn().mockResolvedValue([]),
     },
   },
 }));

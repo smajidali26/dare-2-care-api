@@ -20,6 +20,9 @@ model User {
   updatedAt    DateTime  @updatedAt @map("updated_at")
   isDeleted    Boolean   @default(false) @map("is_deleted")
 
+  donationsRecorded Donation[] @relation("DonationRecordedBy")
+  donationsVoided   Donation[] @relation("DonationVoidedBy")
+
   @@map("users")
 }
 
@@ -259,6 +262,12 @@ model Page {
 /// A donation/payment actually received (manual entry or via Stripe).
 /// Append-only ledger semantics: corrections are made via refund/adjustment
 /// rows and status transitions, not by editing the amount of an existing row.
+///
+/// Two populations live in this one table (ADR-0005):
+///  - pledge payments: donorId set, periodMonth set — reconcile against a subscriber's pledge.
+///  - anonymous/one-off gifts: donorId NULL, periodMonth NULL — real income, but reconcile nobody.
+/// Money is void-only past this point: isDeleted remains only as a legacy tombstone column;
+/// corrections go through voidedAt/voidedByUserId/voidReason, never a delete.
 model Donation {
   id                    String        @id @default(uuid())
   amount                Decimal       @db.Decimal(12, 2) // PKR
@@ -274,13 +283,22 @@ model Donation {
   stripePaymentIntentId String?       @unique @map("stripe_payment_intent_id")
   stripeChargeId        String?       @map("stripe_charge_id")
   recordedByUserId      String?       @map("recorded_by_user_id")
+  periodMonth           String?       @map("period_month") @db.VarChar(7) // "YYYY-MM", UTC-derived; NULL for one-off gifts
+  reference             String? // bank ref / cheque no / receipt no
+  voidedAt              DateTime?     @map("voided_at")
+  voidedByUserId        String?       @map("voided_by_user_id")
+  voidReason            String?       @map("void_reason")
   createdAt             DateTime      @default(now()) @map("created_at")
   updatedAt             DateTime      @updatedAt @map("updated_at")
   isDeleted             Boolean       @default(false) @map("is_deleted")
   donor                 Subscriber?   @relation(fields: [donorId], references: [id])
+  recordedBy            User?         @relation("DonationRecordedBy", fields: [recordedByUserId], references: [id])
+  voidedBy              User?         @relation("DonationVoidedBy", fields: [voidedByUserId], references: [id])
 
   @@index([donorId])
   @@index([status])
   @@index([receivedAt])
+  @@index([donorId, periodMonth])
+  @@index([periodMonth])
   @@map("donations")
 }
