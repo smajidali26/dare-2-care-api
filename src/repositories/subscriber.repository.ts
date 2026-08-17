@@ -1,5 +1,5 @@
 import prisma from '../config/database.config';
-import { Subscriber } from '@prisma/client';
+import { Subscriber, Prisma } from '@prisma/client';
 import { BaseRepository, PaginationOptions, FilterOptions } from './base.repository';
 
 /**
@@ -74,6 +74,19 @@ class SubscriberRepository extends BaseRepository<Subscriber> {
       limit,
       totalPages: Math.ceil(total / limit),
     };
+  }
+
+  /**
+   * Update subscriber
+   * Overrides BaseRepository.update to accept the real Prisma update input
+   * type instead of the untyped Partial<T> the generic base uses — see
+   * DARE2CARE-56.
+   * @param id - Subscriber ID
+   * @param data - Update input
+   * @returns Updated subscriber
+   */
+  async update(id: string, data: Prisma.SubscriberUpdateInput): Promise<Subscriber> {
+    return prisma.subscriber.update({ where: { id }, data });
   }
 
   /**

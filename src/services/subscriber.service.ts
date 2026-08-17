@@ -1,5 +1,5 @@
 import subscriberRepository from '../repositories/subscriber.repository';
-import { Subscriber, Prisma } from '@prisma/client';
+import { Subscriber, Prisma, SubscriberType, PaymentType } from '@prisma/client';
 import { PaginationOptions, FilterOptions } from '../repositories/base.repository';
 import { AppError } from '../utils/AppError';
 
@@ -148,11 +148,31 @@ export const updateSubscriber = async (
     }
   }
 
-  // Convert monthlyDonationAmount to Decimal if provided
-  const updateData: any = { ...subscriberData };
-  if (subscriberData.monthlyDonationAmount !== undefined) {
-    updateData.monthlyDonationAmount = new Prisma.Decimal(subscriberData.monthlyDonationAmount);
-  }
+  // Explicit field-by-field reconstruction (defence in depth — do not spread
+  // the caller-supplied object; see DARE2CARE-56). Undefined fields are left
+  // unchanged by Prisma, null fields are explicitly cleared.
+  const updateData: Prisma.SubscriberUpdateInput = {
+    fullName: subscriberData.fullName,
+    email: subscriberData.email,
+    phoneNumber: subscriberData.phoneNumber,
+    monthlyDonationAmount:
+      subscriberData.monthlyDonationAmount !== undefined
+        ? new Prisma.Decimal(subscriberData.monthlyDonationAmount)
+        : undefined,
+    paymentDayOfMonth: subscriberData.paymentDayOfMonth,
+    emailNotifications: subscriberData.emailNotifications,
+    smsNotifications: subscriberData.smsNotifications,
+    isActive: subscriberData.isActive,
+    subscriptionStartDate: subscriberData.subscriptionStartDate,
+    subscriptionEndDate: subscriberData.subscriptionEndDate,
+    subscriberType: subscriberData.subscriberType as SubscriberType | undefined,
+    paymentType: subscriberData.paymentType as PaymentType | undefined,
+    profileImageUrl: subscriberData.profileImageUrl,
+    isManagement: subscriberData.isManagement,
+    managementRole: subscriberData.managementRole,
+    managementBio: subscriberData.managementBio,
+    displayOrder: subscriberData.displayOrder,
+  };
 
   // Update subscriber
   return subscriberRepository.update(id, updateData);

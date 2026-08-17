@@ -1,5 +1,5 @@
 import teacherRepository from '../repositories/teacher.repository';
-import { Teacher } from '@prisma/client';
+import { Teacher, Prisma } from '@prisma/client';
 import { PaginationOptions, FilterOptions } from '../repositories/base.repository';
 import { AppError } from '../utils/AppError';
 
@@ -127,8 +127,22 @@ export const updateTeacher = async (
     }
   }
 
+  // Explicit field-by-field reconstruction (defence in depth — do not forward
+  // the caller-supplied object verbatim; see DARE2CARE-56). Undefined fields
+  // are left unchanged by Prisma, null fields are explicitly cleared.
+  const updateData: Prisma.TeacherUpdateInput = {
+    fullName: teacherData.fullName,
+    email: teacherData.email,
+    phoneNumber: teacherData.phoneNumber,
+    subject: teacherData.subject,
+    qualification: teacherData.qualification,
+    experience: teacherData.experience,
+    hireDate: teacherData.hireDate,
+    isActive: teacherData.isActive,
+  };
+
   // Update teacher
-  return teacherRepository.update(id, teacherData);
+  return teacherRepository.update(id, updateData);
 };
 
 /**

@@ -52,13 +52,6 @@ export class PageRepository {
     });
   }
 
-  async update(
-    id: string,
-    data: Partial<Omit<Page, 'id' | 'createdAt' | 'updatedAt'>>
-  ): Promise<Page> {
-    return prisma.page.update({ where: { id }, data });
-  }
-
   async deleteBySlug(slug: string): Promise<Page> {
     return prisma.page.delete({ where: { slug } });
   }

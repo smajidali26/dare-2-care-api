@@ -1,5 +1,5 @@
 import prisma from '../config/database.config';
-import { Teacher } from '@prisma/client';
+import { Teacher, Prisma } from '@prisma/client';
 import { BaseRepository, PaginationOptions, FilterOptions } from './base.repository';
 
 /**
@@ -76,6 +76,19 @@ class TeacherRepository extends BaseRepository<Teacher> {
       limit,
       totalPages: Math.ceil(total / limit),
     };
+  }
+
+  /**
+   * Update teacher
+   * Overrides BaseRepository.update to accept the real Prisma update input
+   * type instead of the untyped Partial<T> the generic base uses — see
+   * DARE2CARE-56.
+   * @param id - Teacher ID
+   * @param data - Update input
+   * @returns Updated teacher
+   */
+  async update(id: string, data: Prisma.TeacherUpdateInput): Promise<Teacher> {
+    return prisma.teacher.update({ where: { id }, data });
   }
 
   /**
