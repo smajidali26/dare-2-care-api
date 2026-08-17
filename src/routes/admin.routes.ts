@@ -178,6 +178,18 @@ const FINANCE_WRITE = ['SUPER_ADMIN', 'TREASURER'];
 const FINANCE_VOID = ['SUPER_ADMIN'];
 
 /**
+ * DARE2CARE-25 / ADR-0008 — admin role-permission matrix.
+ * ADMIN_ONLY: SUPER_ADMIN/ADMIN-restricted mutations (e.g. contacts markAsReplied).
+ * CONTENT_MANAGE: content (events/images/pages), uploads, and contacts reads —
+ * CONTENT_MANAGER's full remit, excludes TREASURER.
+ * NOTIF_READ: notification log reads — includes TREASURER (payment-reminder
+ * logs are financial; see ADR-0008 default #1).
+ */
+const ADMIN_ONLY = ['SUPER_ADMIN', 'ADMIN'];
+const CONTENT_MANAGE = ['SUPER_ADMIN', 'ADMIN', 'CONTENT_MANAGER'];
+const NOTIF_READ = ['SUPER_ADMIN', 'ADMIN', 'TREASURER'];
+
+/**
  * Dashboard Stats Route
  * Accessible to all authenticated admin users
  */
@@ -275,8 +287,21 @@ router.post('/teachers/:id/restore', requireRole(['SUPER_ADMIN', 'ADMIN']), vali
 
 /**
  * File Upload Routes
- * Accessible to all authenticated admin users
+ * Restricted to SUPER_ADMIN, ADMIN, CONTENT_MANAGER (ADR-0008)
+ *
+ * requireRole is registered as its OWN router.post()/delete() call per route
+ * (rather than as the first handler alongside handleMulterError) so a 403 it
+ * raises can't be caught by handleMulterError. Express's Route#dispatch keeps
+ * searching for an error handler within the SAME route's handler stack
+ * before bubbling out to the router — since handleMulterError has 4-arg
+ * (error-handling) arity, it would otherwise intercept requireRole's
+ * ApiError(403) and rewrite it into a 400 with a different body shape. A
+ * Route registered with only requireRole has non-error arity itself, so the
+ * router-level error search skips straight past it to the real global
+ * errorHandler when requireRole rejects, and simply falls through to the
+ * next router.post()/delete() registered for the same path when it passes.
  */
+router.post('/upload/image', requireRole(CONTENT_MANAGE));
 router.post(
   '/upload/image',
   uploadSingleImage,
@@ -284,6 +309,7 @@ router.post(
   uploadController.uploadImage
 );
 
+router.post('/upload/images', requireRole(CONTENT_MANAGE));
 router.post(
   '/upload/images',
   uploadMultipleImages,
@@ -291,6 +317,7 @@ router.post(
   uploadController.uploadImages
 );
 
+router.post('/upload/video', requireRole(CONTENT_MANAGE));
 router.post(
   '/upload/video',
   uploadSingleVideo,
@@ -298,6 +325,7 @@ router.post(
   uploadController.uploadVideo
 );
 
+router.delete('/upload/:bucket/*', requireRole(CONTENT_MANAGE));
 router.delete(
   '/upload/:bucket/*',
   uploadController.deleteUpload
@@ -305,61 +333,65 @@ router.delete(
 
 /**
  * Event Management Routes
- * Accessible to all authenticated admin users
+ * Reads: accessible to all authenticated admin users.
+ * Mutations: restricted to SUPER_ADMIN, ADMIN, CONTENT_MANAGER (ADR-0008).
  */
 router.get('/events', validate(eventFiltersSchema), eventController.list);
 router.get('/events/:id', validate(eventIdSchema), eventController.get);
-router.post('/events', validate(createEventSchema), eventController.create);
-router.put('/events/:id', validate(eventIdSchema), validate(updateEventSchema), eventController.update);
-router.delete('/events/:id', validate(eventIdSchema), eventController.delete);
+router.post('/events', requireRole(CONTENT_MANAGE), validate(createEventSchema), eventController.create);
+router.put('/events/:id', requireRole(CONTENT_MANAGE), validate(eventIdSchema), validate(updateEventSchema), eventController.update);
+router.delete('/events/:id', requireRole(CONTENT_MANAGE), validate(eventIdSchema), eventController.delete);
 
 // Event publishing
-router.put('/events/:id/publish', validate(eventIdSchema), eventController.publish);
-router.put('/events/:id/unpublish', validate(eventIdSchema), eventController.unpublish);
+router.put('/events/:id/publish', requireRole(CONTENT_MANAGE), validate(eventIdSchema), eventController.publish);
+router.put('/events/:id/unpublish', requireRole(CONTENT_MANAGE), validate(eventIdSchema), eventController.unpublish);
 
 // Event media management
 router.get('/events/:id/media', validate(eventIdSchema), eventController.getMedia);
-router.post('/events/:id/media', validate(eventIdSchema), validate(eventMediaSchema), eventController.addMedia);
-router.delete('/events/:id/media/:mediaId', validate(eventIdSchema), validate(mediaIdSchema), eventController.deleteMedia);
-router.put('/events/:id/media/:mediaId', validate(eventIdSchema), validate(mediaIdSchema), validate(updateMediaOrderSchema), eventController.updateMediaOrder);
+router.post('/events/:id/media', requireRole(CONTENT_MANAGE), validate(eventIdSchema), validate(eventMediaSchema), eventController.addMedia);
+router.delete('/events/:id/media/:mediaId', requireRole(CONTENT_MANAGE), validate(eventIdSchema), validate(mediaIdSchema), eventController.deleteMedia);
+router.put('/events/:id/media/:mediaId', requireRole(CONTENT_MANAGE), validate(eventIdSchema), validate(mediaIdSchema), validate(updateMediaOrderSchema), eventController.updateMediaOrder);
 
 /**
  * Image Library Management Routes
- * Accessible to all authenticated admin users
+ * Reads: accessible to all authenticated admin users.
+ * Mutations: restricted to SUPER_ADMIN, ADMIN, CONTENT_MANAGER (ADR-0008).
  */
 router.get('/images', validate(imageFiltersSchema), imageController.list);
 
 // Slider reorder must be registered before dynamic /:id routes so Express
 // doesn't match "slider" as an :id parameter.
-router.put('/images/slider/reorder', validate(reorderSliderImagesSchema), imageController.reorderSlider);
+router.put('/images/slider/reorder', requireRole(CONTENT_MANAGE), validate(reorderSliderImagesSchema), imageController.reorderSlider);
 
 router.get('/images/:id', validate(imageIdSchema), imageController.get);
-router.post('/images', validate(createImageSchema), imageController.create);
-router.put('/images/:id', validate(imageIdSchema), validate(updateImageSchema), imageController.update);
-router.delete('/images/:id', validate(imageIdSchema), imageController.delete);
+router.post('/images', requireRole(CONTENT_MANAGE), validate(createImageSchema), imageController.create);
+router.put('/images/:id', requireRole(CONTENT_MANAGE), validate(imageIdSchema), validate(updateImageSchema), imageController.update);
+router.delete('/images/:id', requireRole(CONTENT_MANAGE), validate(imageIdSchema), imageController.delete);
 
 // Image publishing
-router.put('/images/:id/publish', validate(imageIdSchema), imageController.publish);
-router.put('/images/:id/unpublish', validate(imageIdSchema), imageController.unpublish);
+router.put('/images/:id/publish', requireRole(CONTENT_MANAGE), validate(imageIdSchema), imageController.publish);
+router.put('/images/:id/unpublish', requireRole(CONTENT_MANAGE), validate(imageIdSchema), imageController.unpublish);
 
 // Slider membership toggles (specific to a single image)
-router.put('/images/:id/slider', validate(imageIdSchema), imageController.markAsSlider);
-router.delete('/images/:id/slider', validate(imageIdSchema), imageController.unmarkAsSlider);
+router.put('/images/:id/slider', requireRole(CONTENT_MANAGE), validate(imageIdSchema), imageController.markAsSlider);
+router.delete('/images/:id/slider', requireRole(CONTENT_MANAGE), validate(imageIdSchema), imageController.unmarkAsSlider);
 
 /**
  * Contact Submission Management Routes (Admin)
- * Accessible to all authenticated admin users
+ * Reads: SUPER_ADMIN, ADMIN, CONTENT_MANAGER (excludes TREASURER).
+ * markAsReplied: SUPER_ADMIN, ADMIN only (ADR-0008).
  */
-router.get('/contacts', validate(contactFiltersSchema), contactController.list);
-router.get('/contacts/:id', validate(contactIdSchema), contactController.get);
-router.put('/contacts/:id/replied', validate(contactIdSchema), contactController.markAsReplied);
+router.get('/contacts', requireRole(CONTENT_MANAGE), validate(contactFiltersSchema), contactController.list);
+router.get('/contacts/:id', requireRole(CONTENT_MANAGE), validate(contactIdSchema), contactController.get);
+router.put('/contacts/:id/replied', requireRole(ADMIN_ONLY), validate(contactIdSchema), contactController.markAsReplied);
 
 /**
  * Notification Log Management Routes (Admin)
- * Accessible to all authenticated admin users
+ * Read log: SUPER_ADMIN, ADMIN, TREASURER (ADR-0008 — payment-reminder logs
+ * are financial data). Send: SUPER_ADMIN, ADMIN only (unchanged).
  */
-router.get('/notifications', validate(notificationFiltersSchema), notificationController.list);
-router.get('/notifications/:id', validate(notificationIdSchema), notificationController.get);
+router.get('/notifications', requireRole(NOTIF_READ), validate(notificationFiltersSchema), notificationController.list);
+router.get('/notifications/:id', requireRole(NOTIF_READ), validate(notificationIdSchema), notificationController.get);
 router.post(
   '/notifications/send',
   requireRole(['SUPER_ADMIN', 'ADMIN']),
@@ -369,13 +401,14 @@ router.post(
 
 /**
  * Page/Content Management Routes (Admin)
- * Accessible to all authenticated admin users
+ * Reads: accessible to all authenticated admin users.
+ * Mutations: restricted to SUPER_ADMIN, ADMIN, CONTENT_MANAGER (ADR-0008).
  */
 router.get('/pages', pageController.list);
-router.post('/pages', validate(createPageSchema), pageController.create);
+router.post('/pages', requireRole(CONTENT_MANAGE), validate(createPageSchema), pageController.create);
 router.get('/pages/:slug', validate(pageSlugSchema), pageController.getBySlug);
-router.put('/pages/:slug', validate(updatePageSchema), pageController.update);
-router.delete('/pages/:slug', validate(pageSlugSchema), pageController.delete);
+router.put('/pages/:slug', requireRole(CONTENT_MANAGE), validate(updatePageSchema), pageController.update);
+router.delete('/pages/:slug', requireRole(CONTENT_MANAGE), validate(pageSlugSchema), pageController.delete);
 
 /**
  * System Settings Routes (Admin)
