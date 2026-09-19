@@ -60,8 +60,8 @@ export class PageService {
   async updatePage(
     slug: string,
     data: {
-      title: string;
-      content: string;
+      title?: string;
+      content?: string;
       metaDescription?: string | null;
       isPublished?: boolean;
     }

@@ -97,12 +97,13 @@ export class ImageService {
       title?: string;
       altText?: string;
       description?: string;
+      isSliderImage?: boolean;
       isPublished?: boolean;
       displayOrder?: number;
     }
   ): Promise<Image> {
     // Check if image exists
-    await this.getImageById(id);
+    const existing = await this.getImageById(id);
 
     const updateData: Prisma.ImageUpdateInput = {};
 
@@ -111,6 +112,19 @@ export class ImageService {
     if (data.description !== undefined) updateData.description = data.description;
     if (data.isPublished !== undefined) updateData.isPublished = data.isPublished;
     if (data.displayOrder !== undefined) updateData.displayOrder = data.displayOrder;
+
+    if (data.isSliderImage !== undefined) {
+      updateData.isSliderImage = data.isSliderImage;
+
+      // Adding an image to the slider for the first time puts it at the end,
+      // matching markAsSliderImage(). Without this an image joining the slider
+      // would keep displayOrder 0 and jump to the front of the carousel.
+      const joiningSlider = data.isSliderImage && !existing.isSliderImage;
+      if (joiningSlider && data.displayOrder === undefined) {
+        const maxOrder = await this.imageRepository.getMaxDisplayOrder();
+        updateData.displayOrder = maxOrder + 1;
+      }
+    }
 
     return this.imageRepository.update(id, updateData);
   }

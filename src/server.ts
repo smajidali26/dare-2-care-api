@@ -1,11 +1,19 @@
-import dotenv from 'dotenv';
+/**
+ * Load environment variables from .env BEFORE anything else is imported.
+ *
+ * This side-effect import must stay first: `import` statements are hoisted and
+ * evaluated in order, so any module pulled in above this line would read
+ * `process.env` before the .env file had been applied. Several modules read
+ * config at module scope (`config/supabase.config.ts` decides whether the
+ * storage client can be built, `app.ts` builds the CORS allow-list), so loading
+ * dotenv after them silently disabled file uploads and the CORS allow-list
+ * everywhere that configuration comes from a .env file rather than the
+ * platform environment.
+ */
+import 'dotenv/config';
+
 import app from './app';
 import { disconnectDatabase } from './config/database.config';
-
-/**
- * Load environment variables from .env file
- */
-dotenv.config();
 
 /**
  * Server Configuration

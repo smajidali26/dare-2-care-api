@@ -53,6 +53,10 @@ export const updateImageSchema = z.object({
       .string()
       .max(1000, 'Description must be less than 1000 characters')
       .optional(),
+    // The admin "Edit image" form has a "Show in homepage slider" checkbox, so
+    // this field has to be accepted here — without it Zod stripped the value and
+    // the checkbox silently did nothing while the API still returned 200.
+    isSliderImage: z.boolean().optional(),
     isPublished: z.boolean().optional(),
     displayOrder: z.number().int('Display order must be an integer').optional(),
   }),
