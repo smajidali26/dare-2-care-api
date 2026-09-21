@@ -1,3 +1,8 @@
+// `npm run prisma:seed` runs this file through ts-node directly, which — unlike
+// the Prisma CLI — does not load .env for us. Without this the seeder fails with
+// "Environment variable not found: DATABASE_URL".
+import 'dotenv/config';
+
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 

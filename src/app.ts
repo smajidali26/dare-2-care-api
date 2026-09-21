@@ -13,6 +13,21 @@ import authRoutes from './routes/auth.routes';
 const app: Application = express();
 
 /**
+ * Trust the reverse proxy in front of the app (Vercel, and any other
+ * load balancer that terminates TLS and forwards X-Forwarded-For).
+ *
+ * Without this, `req.ip` resolves to the *proxy's* address rather than the
+ * visitor's, so every request on the internet shares a single rate-limit
+ * bucket: five bad logins from anyone locked every admin out for 15 minutes,
+ * and the whole public site shared one 100-request/15-minute budget.
+ *
+ * `1` = trust exactly one proxy hop, which is what Vercel puts in front of the
+ * function. Trusting every hop (`true`) would let a caller spoof X-Forwarded-For
+ * and bypass rate limiting entirely.
+ */
+app.set('trust proxy', 1);
+
+/**
  * CORS Configuration
  * Allowed origins are sourced from CORS_ORIGINS (comma-separated) env var.
  * Falls back to localhost dev origins so local startup is not blocked when the var is unset.
