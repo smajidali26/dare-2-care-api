@@ -1,0 +1,144 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  # A newer push to the same branch supersedes this run.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Typecheck and build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      # Prisma Client is generated code; tsc cannot typecheck without it.
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: npm run build
+
+      - name: Check deployment routing config
+        # Guards a past outage: vercel.json carried a rewrite whose destination
+        # was the built bundle, and because a rewrite replaces the path the
+        # destination receives, Express saw "/dist/app.js" for every request and
+        # returned 404 for the entire API. Nothing in the code or the build
+        # caught it, so assert the shape here.
+        run: |
+          node -e "
+            const fs = require('fs');
+            if (!fs.existsSync('vercel.json')) process.exit(0);
+            const cfg = JSON.parse(fs.readFileSync('vercel.json', 'utf8'));
+            const bad = (cfg.rewrites || []).filter(r => /\.(js|cjs|mjs)$/.test(r.destination || ''));
+            if (bad.length) {
+              console.error('vercel.json rewrites a request path to a build artifact:');
+              bad.forEach(r => console.error('  ' + r.source + ' -> ' + r.destination));
+              console.error('A Vercel rewrite replaces the path the destination receives, so the');
+              console.error('Express app is handed the artifact path instead of the caller\'s route');
+              console.error('and every request 404s. Let the express framework preset route instead.');
+              process.exit(1);
+            }
+            console.log('vercel.json routing looks fine');
+          "
+
+  smoke:
+    name: Smoke test against a real database
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: dare2care_ci
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/dare2care_ci?schema=public
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/dare2care_ci?schema=public
+      JWT_SECRET: ci-only-jwt-secret-not-used-anywhere-else
+      JWT_REFRESH_SECRET: ci-only-refresh-secret-not-used-anywhere-else
+      JWT_EXPIRES_IN: 1h
+      JWT_REFRESH_EXPIRES_IN: 7d
+      PORT: 4000
+      CORS_ORIGINS: http://localhost:3000,http://localhost:3001
+      CRON_SECRET: ci-only-cron-secret
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      # The seed step below constructs a PrismaClient. Prisma's postinstall
+      # usually generates it, but that is a side-effect we should not depend on.
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Apply migrations
+        run: npx prisma migrate deploy
+
+      - name: Seed
+        run: npx ts-node prisma/seed.ts
+
+      - name: Build
+        run: npm run build
+
+      - name: Start the API
+        # NODE_ENV belongs to the server process only. Setting it at job level
+        # made `npm ci` omit devDependencies, so @types/* and tsc were missing
+        # and the build failed with TS7016 "Could not find a declaration file
+        # for module 'express'".
+        env:
+          NODE_ENV: production
+        run: |
+          node dist/server.js > /tmp/api.log 2>&1 &
+          echo $! > /tmp/api.pid
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:4000/api/health > /dev/null; then
+              echo "API is up"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "API did not start within 30s"
+          cat /tmp/api.log
+          exit 1
+
+      - name: Smoke test
+        run: BASE_URL=http://localhost:4000 ./scripts/smoke-test.sh
+
+      - name: API log
+        if: always()
+        run: cat /tmp/api.log || true
+
+      - name: Stop the API
+        if: always()
+        run: kill "$(cat /tmp/api.pid)" 2>/dev/null || true
