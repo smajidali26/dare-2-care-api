@@ -83,7 +83,6 @@ jobs:
       JWT_REFRESH_SECRET: ci-only-refresh-secret-not-used-anywhere-else
       JWT_EXPIRES_IN: 1h
       JWT_REFRESH_EXPIRES_IN: 7d
-      NODE_ENV: production
       PORT: 4000
       CORS_ORIGINS: http://localhost:3000,http://localhost:3001
       CRON_SECRET: ci-only-cron-secret
@@ -113,6 +112,12 @@ jobs:
         run: npm run build
 
       - name: Start the API
+        # NODE_ENV belongs to the server process only. Setting it at job level
+        # made `npm ci` omit devDependencies, so @types/* and tsc were missing
+        # and the build failed with TS7016 "Could not find a declaration file
+        # for module 'express'".
+        env:
+          NODE_ENV: production
         run: |
           node dist/server.js > /tmp/api.log 2>&1 &
           echo $! > /tmp/api.pid
