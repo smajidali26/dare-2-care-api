@@ -243,6 +243,9 @@ enum PaymentStatus {
   REFUNDED
 }
 
+/// A CMS page. Published pages also make up the website menu: top-level pages
+/// are menu items, and their sub pages (one level only) are the links in that
+/// item's dropdown.
 model Page {
   id              String   @id @default(uuid())
   slug            String   @unique
@@ -250,9 +253,21 @@ model Page {
   content         String   @db.Text
   metaDescription String?  @map("meta_description") @db.VarChar(160)
   isPublished     Boolean  @default(true) @map("is_published")
+  /// Set for a sub page. Deleting a parent keeps its sub pages as top-level pages.
+  parentId        String?  @map("parent_id")
+  parent          Page?    @relation("PageTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children        Page[]   @relation("PageTree")
+  /// Text of this page's link in the menu; the title is used when empty.
+  menuLabel       String?  @map("menu_label") @db.VarChar(60)
+  /// Heading of the dropdown for a top-level page with sub pages ("About");
+  /// the menu label (or title) is used when empty.
+  menuHeading     String?  @map("menu_heading") @db.VarChar(60)
+  /// Position among its siblings in the menu, lowest first.
+  menuOrder       Int      @default(0) @map("menu_order")
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
+  @@index([parentId])
   @@map("pages")
 }
 
