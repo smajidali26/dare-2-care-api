@@ -24,6 +24,9 @@ import { DonationRepository } from '../repositories/donation.repository';
 import { DonationService } from '../services/donation.service';
 import { DonationController } from '../controllers/donation.controller';
 import { donationIntentSchema } from '../validators/donation.validator';
+import { SettingRepository } from '../repositories/setting.repository';
+import { HomepageService } from '../services/homepage.service';
+import { HomepageController } from '../controllers/homepage.controller';
 
 /**
  * Public Routes
@@ -59,6 +62,8 @@ const subscriberController = new SubscriberController();
 
 const donationController = new DonationController(new DonationService(new DonationRepository(prisma)));
 
+const homepageController = new HomepageController(new HomepageService(new SettingRepository()));
+
 /**
  * Event Routes
  */
@@ -91,6 +96,12 @@ router.get('/management', subscriberController.getManagementMembers);
  */
 // Get published page by slug
 router.get('/pages/:slug', validate(pageSlugSchema), pageController.getPublished);
+
+/**
+ * Homepage Routes
+ */
+// "What We Do" section (the built-in default until an editor saves one)
+router.get('/homepage/what-we-do', homepageController.getWhatWeDo);
 
 /**
  * Donation Routes

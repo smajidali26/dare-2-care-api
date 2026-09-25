@@ -8,6 +8,10 @@
 #
 # In CI this runs against a freshly migrated and seeded Postgres, so the
 # seeded admin credentials below are expected to work.
+#
+# Read-only by default. SMOKE_WRITE=1 also saves content and reads it back;
+# CI sets it because its database is thrown away. Never set it against an API
+# whose content matters: it overwrites the homepage "What We Do" section.
 
 set -uo pipefail
 
@@ -46,6 +50,7 @@ check "" GET /api/public/images/slider 200
 check "" GET /api/public/management 200
 check "" GET /api/public/pages/about-us 200
 check "" GET /api/public/pages/history 200
+check "" GET /api/public/homepage/what-we-do 200
 
 echo "routing and error handling"
 # Guards the outage where a bad rewrite handed Express the wrong path and every
@@ -63,6 +68,7 @@ else
 fi
 check "" GET /api/public/pages/no-such-page 404
 check "" GET /api/admin/stats 401
+check "" PUT /api/admin/homepage/what-we-do 401
 
 echo "authentication"
 LOGIN_BODY=$(curl -s --max-time 20 -X POST "$BASE_URL/api/auth/login" \
@@ -87,6 +93,28 @@ check "" GET /api/admin/events 200 "${AUTH[@]}"
 check "" GET /api/admin/images 200 "${AUTH[@]}"
 check "" GET /api/admin/pages 200 "${AUTH[@]}"
 check "" GET /api/admin/contacts 200 "${AUTH[@]}"
+check "" GET /api/admin/homepage/what-we-do 200 "${AUTH[@]}"
+# Rejected by validation before anything is written, so safe on any API.
+check "" PUT /api/admin/homepage/what-we-do 400 "${AUTH[@]}" \
+  -H 'Content-Type: application/json' -d '{"heading":"Smoke","subheading":"","items":[]}'
+
+if [ "${SMOKE_WRITE:-0}" = "1" ]; then
+  echo "content round-trip (SMOKE_WRITE=1)"
+  SECTION='{"heading":"Smoke test heading","subheading":"","items":[{"title":"Card","description":"Text","icon":"heart","color":"teal"}]}'
+  check "" PUT /api/admin/homepage/what-we-do 200 "${AUTH[@]}" \
+    -H 'Content-Type: application/json' -d "$SECTION"
+
+  # The public site must see the saved version, not the built-in default.
+  : > /tmp/smoke-body
+  code=$(curl -s -o /tmp/smoke-body -w '%{http_code}' --max-time 20 "$BASE_URL/api/public/homepage/what-we-do")
+  if [ "$code" = "200" ] && grep -q "Smoke test heading" /tmp/smoke-body; then
+    printf '  ok   %-44s serves the saved section\n' "GET /api/public/homepage/what-we-do"
+    pass=$((pass + 1))
+  else
+    printf '  FAIL %-44s got %s; body: %s\n' "GET /api/public/homepage/what-we-do" "$code" "$(head -c 200 /tmp/smoke-body)"
+    fail=$((fail + 1))
+  fi
+fi
 
 echo
 echo "passed $pass, failed $fail"

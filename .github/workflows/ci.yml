@@ -133,7 +133,9 @@ jobs:
           exit 1
 
       - name: Smoke test
-        run: BASE_URL=http://localhost:4000 ./scripts/smoke-test.sh
+        # SMOKE_WRITE=1 adds a save-and-read-back check; safe here because this
+        # database only exists for the length of the job.
+        run: BASE_URL=http://localhost:4000 SMOKE_WRITE=1 ./scripts/smoke-test.sh
 
       - name: API log
         if: always()
