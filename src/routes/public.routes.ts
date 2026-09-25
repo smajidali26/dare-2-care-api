@@ -94,6 +94,9 @@ router.get('/management', subscriberController.getManagementMembers);
 /**
  * Page Routes
  */
+// Published pages for the website menu: top-level pages and their sub pages
+router.get('/pages', pageController.listMenu);
+
 // Get published page by slug
 router.get('/pages/:slug', validate(pageSlugSchema), pageController.getPublished);
 

@@ -31,6 +31,12 @@ export class PageController {
     res.json({ success: true, data: page, message: 'Page updated successfully' });
   });
 
+  /** Published pages for the website menu (no content). */
+  listMenu = asyncHandler(async (req: Request, res: Response) => {
+    const pages = await this.pageService.getMenuPages();
+    res.json({ success: true, data: pages });
+  });
+
   getPublished = asyncHandler(async (req: Request, res: Response) => {
     const slug = getParamAsString(req.params.slug);
     const page = await this.pageService.getPublishedPageBySlug(slug);

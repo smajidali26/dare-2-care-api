@@ -51,6 +51,7 @@ check "" GET /api/public/management 200
 check "" GET /api/public/pages/about-us 200
 check "" GET /api/public/pages/history 200
 check "" GET /api/public/homepage/what-we-do 200
+check "" GET /api/public/pages 200
 
 echo "routing and error handling"
 # Guards the outage where a bad rewrite handed Express the wrong path and every
@@ -114,6 +115,24 @@ if [ "${SMOKE_WRITE:-0}" = "1" ]; then
     printf '  FAIL %-44s got %s; body: %s\n' "GET /api/public/homepage/what-we-do" "$code" "$(head -c 200 /tmp/smoke-body)"
     fail=$((fail + 1))
   fi
+
+  echo "sub pages and the menu (SMOKE_WRITE=1)"
+  ABOUT_ID=$(curl -s --max-time 20 "$BASE_URL/api/admin/pages" "${AUTH[@]}" | node -e \
+    "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{try{process.stdout.write((JSON.parse(d).data.find(p=>p.slug==='about-us')||{}).id||'')}catch(e){}})")
+  check "" POST /api/admin/pages 201 "${AUTH[@]}" -H 'Content-Type: application/json' \
+    -d "{\"slug\":\"about-smoke-sub\",\"title\":\"Smoke sub page\",\"content\":\"<p>x</p>\",\"parentId\":\"$ABOUT_ID\",\"menuLabel\":\"Smoke link\"}"
+  : > /tmp/smoke-body
+  code=$(curl -s -o /tmp/smoke-body -w '%{http_code}' --max-time 20 "$BASE_URL/api/public/pages")
+  if [ "$code" = "200" ] && node -e "const p=JSON.parse(require('fs').readFileSync('/tmp/smoke-body','utf8')).data.find(p=>p.slug==='about-smoke-sub');process.exit(p&&p.parentId==='$ABOUT_ID'&&p.menuLabel==='Smoke link'?0:1)"; then
+    printf '  ok   %-44s lists the sub page under About Us\n' "GET /api/public/pages"
+    pass=$((pass + 1))
+  else
+    printf '  FAIL %-44s got %s; body: %s\n' "GET /api/public/pages" "$code" "$(head -c 200 /tmp/smoke-body)"
+    fail=$((fail + 1))
+  fi
+  # A page with sub pages can't be deleted; the sub page itself can.
+  check "" DELETE /api/admin/pages/about-us 409 "${AUTH[@]}"
+  check "" DELETE /api/admin/pages/about-smoke-sub 200 "${AUTH[@]}"
 fi
 
 echo
