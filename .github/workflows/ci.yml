@@ -1,10 +1,11 @@
 name: CI
 
 on:
+  # Gitflow: feature/* PRs target develop; release/* and hotfix/* PRs target main.
   pull_request:
-    branches: [main]
+    branches: [main, develop]
   push:
-    branches: [main]
+    branches: [main, develop]
 
 concurrency:
   # A newer push to the same branch supersedes this run.
