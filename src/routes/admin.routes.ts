@@ -52,6 +52,9 @@ import { SettingRepository } from '../repositories/setting.repository';
 import { SettingService } from '../services/setting.service';
 import { SettingController } from '../controllers/setting.controller';
 import { upsertSettingSchema, settingKeySchema, settingQuerySchema } from '../validators/setting.validator';
+import { HomepageService } from '../services/homepage.service';
+import { HomepageController } from '../controllers/homepage.controller';
+import { updateWhatWeDoSchema } from '../validators/homepage.validator';
 import { DonationRepository } from '../repositories/donation.repository';
 import { DonationService } from '../services/donation.service';
 import { DonationController } from '../controllers/donation.controller';
@@ -143,6 +146,12 @@ const pageController = new PageController(pageService);
 const settingRepository = new SettingRepository();
 const settingService = new SettingService(settingRepository);
 const settingController = new SettingController(settingService);
+
+/**
+ * Initialize Homepage Services (content is stored in system settings)
+ */
+const homepageService = new HomepageService(settingRepository);
+const homepageController = new HomepageController(homepageService);
 
 /**
  * Initialize Donation (Finance) Services
@@ -339,6 +348,20 @@ router.post('/pages', validate(createPageSchema), pageController.create);
 router.get('/pages/:slug', validate(pageSlugSchema), pageController.getBySlug);
 router.put('/pages/:slug', validate(updatePageSchema), pageController.update);
 router.delete('/pages/:slug', validate(pageSlugSchema), pageController.delete);
+
+/**
+ * Homepage Section Routes (Admin)
+ * Restricted to the roles that edit website content
+ */
+const CONTENT_EDITORS = ['SUPER_ADMIN', 'ADMIN', 'CONTENT_MANAGER'];
+
+router.get('/homepage/what-we-do', requireRole(CONTENT_EDITORS), homepageController.getWhatWeDo);
+router.put(
+  '/homepage/what-we-do',
+  requireRole(CONTENT_EDITORS),
+  validate(updateWhatWeDoSchema),
+  homepageController.updateWhatWeDo
+);
 
 /**
  * System Settings Routes (Admin)
