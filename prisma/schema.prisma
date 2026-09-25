@@ -244,8 +244,9 @@ enum PaymentStatus {
 }
 
 /// A CMS page. Published pages also make up the website menu: top-level pages
-/// are menu items, and their sub pages (one level only) are the links in that
-/// item's dropdown.
+/// are menu items, their sub pages are the links in that item's dropdown, and
+/// sub pages of those are listed under them (three levels at most; see
+/// MAX_MENU_DEPTH in page.service.ts).
 model Page {
   id              String   @id @default(uuid())
   slug            String   @unique

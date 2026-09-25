@@ -1,6 +1,18 @@
-import { MenuPage, PageMenuFields, PageRepository } from '../repositories/page.repository';
+import {
+  MenuPage,
+  PageMenuFields,
+  PageRepository,
+  PageTreeNode,
+} from '../repositories/page.repository';
 import { Page } from '@prisma/client';
 import { AppError } from '../utils/AppError';
+
+/**
+ * How many levels the website menu has: top-level pages, their sub pages, and
+ * the sub pages of those (About › Our History › …). The admin portal and the
+ * website have the same limit (MAX_MENU_DEPTH); keep them in step.
+ */
+export const MAX_MENU_DEPTH = 3;
 
 /**
  * Slugs reserved by static public-site routes. A CMS page with one of these slugs
@@ -28,20 +40,48 @@ export class PageService {
   constructor(private pageRepository: PageRepository) {}
 
   /**
-   * The menu is two levels deep: a sub page must hang off a top-level page,
-   * and never off itself.
+   * A page can go under any other page, as long as neither it nor its own sub
+   * pages end up deeper than MAX_MENU_DEPTH, and it doesn't go under one of
+   * its own sub pages. `pageId` is the page being moved (absent on create).
    */
   private async assertValidParent(parentId: string, pageId?: string): Promise<void> {
     if (parentId === pageId) {
       throw new AppError('A page cannot be its own parent', 400);
     }
-    const parent = await this.pageRepository.findById(parentId);
+    const nodes = await this.pageRepository.findTreeNodes();
+    const byId = new Map(nodes.map((node) => [node.id, node]));
+    const parent = byId.get(parentId);
     if (!parent) {
       throw new AppError('Parent page not found', 400);
     }
-    if (parent.parentId) {
+
+    // The parent's level in the menu (1 = top level), walking up its parents.
+    let parentLevel = 0;
+    let node: PageTreeNode | undefined = parent;
+    while (node && parentLevel <= nodes.length) {
+      if (node.id === pageId) {
+        throw new AppError('A page cannot go under one of its own sub pages', 400);
+      }
+      parentLevel += 1;
+      node = node.parentId ? byId.get(node.parentId) : undefined;
+    }
+    if (parentLevel >= MAX_MENU_DEPTH) {
       throw new AppError(
-        `"${parent.title}" is itself a sub page. Sub pages can only go under a top-level page.`,
+        `"${parent.title}" is on the last menu level, so it can't have sub pages. The menu is ${MAX_MENU_DEPTH} levels deep.`,
+        400
+      );
+    }
+
+    // Levels the page takes up itself: 1, plus however deep its sub pages go.
+    const levels = (id: string, seen: Set<string>): number => {
+      if (seen.has(id)) return 0;
+      seen.add(id);
+      const children = nodes.filter((child) => child.parentId === id);
+      return 1 + Math.max(0, ...children.map((child) => levels(child.id, seen)));
+    };
+    if (pageId && parentLevel + levels(pageId, new Set()) > MAX_MENU_DEPTH) {
+      throw new AppError(
+        `Under "${parent.title}", this page's sub pages would be more than ${MAX_MENU_DEPTH} menu levels deep. Move them first.`,
         400
       );
     }
@@ -115,13 +155,6 @@ export class PageService {
     }
     if (data.parentId) {
       await this.assertValidParent(data.parentId, existing.id);
-      const children = await this.pageRepository.countChildren(existing.id);
-      if (children > 0) {
-        throw new AppError(
-          'This page has sub pages, so it cannot become a sub page itself. Move its sub pages first.',
-          400
-        );
-      }
     }
     return this.pageRepository.updateBySlug(slug, { ...data, ...this.normaliseMenuFields(data) });
   }

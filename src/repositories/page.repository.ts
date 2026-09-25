@@ -15,6 +15,9 @@ export type MenuPage = Pick<
   'id' | 'slug' | 'title' | 'parentId' | 'menuLabel' | 'menuHeading' | 'menuOrder'
 >;
 
+/** A page's place in the page tree. */
+export type PageTreeNode = Pick<Page, 'id' | 'parentId' | 'title'>;
+
 export class PageRepository {
   async findBySlug(slug: string): Promise<Page | null> {
     return prisma.page.findUnique({ where: { slug } });
@@ -43,6 +46,11 @@ export class PageRepository {
       },
       orderBy: [{ menuOrder: 'asc' }, { title: 'asc' }],
     });
+  }
+
+  /** Every page (drafts too) with just its parent, to check where a page may go. */
+  async findTreeNodes(): Promise<PageTreeNode[]> {
+    return prisma.page.findMany({ select: { id: true, parentId: true, title: true } });
   }
 
   async countChildren(id: string): Promise<number> {

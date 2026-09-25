@@ -37,6 +37,10 @@ check() { # label method path expected-status [extra curl args...]
   fi
 }
 
+created_id() { # id of the record in the last response body
+  node -e "try{process.stdout.write(JSON.parse(require('fs').readFileSync('/tmp/smoke-body','utf8')).data.id||'')}catch(e){}"
+}
+
 echo "Smoke testing $BASE_URL"
 echo
 
@@ -121,6 +125,7 @@ if [ "${SMOKE_WRITE:-0}" = "1" ]; then
     "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{try{process.stdout.write((JSON.parse(d).data.find(p=>p.slug==='about-us')||{}).id||'')}catch(e){}})")
   check "" POST /api/admin/pages 201 "${AUTH[@]}" -H 'Content-Type: application/json' \
     -d "{\"slug\":\"about-smoke-sub\",\"title\":\"Smoke sub page\",\"content\":\"<p>x</p>\",\"parentId\":\"$ABOUT_ID\",\"menuLabel\":\"Smoke link\"}"
+  SUB_ID=$(created_id)
   : > /tmp/smoke-body
   code=$(curl -s -o /tmp/smoke-body -w '%{http_code}' --max-time 20 "$BASE_URL/api/public/pages")
   if [ "$code" = "200" ] && node -e "const p=JSON.parse(require('fs').readFileSync('/tmp/smoke-body','utf8')).data.find(p=>p.slug==='about-smoke-sub');process.exit(p&&p.parentId==='$ABOUT_ID'&&p.menuLabel==='Smoke link'?0:1)"; then
@@ -130,8 +135,16 @@ if [ "${SMOKE_WRITE:-0}" = "1" ]; then
     printf '  FAIL %-44s got %s; body: %s\n' "GET /api/public/pages" "$code" "$(head -c 200 /tmp/smoke-body)"
     fail=$((fail + 1))
   fi
-  # A page with sub pages can't be deleted; the sub page itself can.
+  # The menu's third level: a page under the sub page. Nothing can go under that.
+  check "" POST /api/admin/pages 201 "${AUTH[@]}" -H 'Content-Type: application/json' \
+    -d "{\"slug\":\"about-smoke-sub-2\",\"title\":\"Smoke third level\",\"content\":\"<p>x</p>\",\"parentId\":\"$SUB_ID\"}"
+  SUB2_ID=$(created_id)
+  check "" POST /api/admin/pages 400 "${AUTH[@]}" -H 'Content-Type: application/json' \
+    -d "{\"slug\":\"about-smoke-sub-3\",\"title\":\"Too deep\",\"content\":\"<p>x</p>\",\"parentId\":\"$SUB2_ID\"}"
+  # A page with sub pages can't be deleted; once they are gone, it can.
   check "" DELETE /api/admin/pages/about-us 409 "${AUTH[@]}"
+  check "" DELETE /api/admin/pages/about-smoke-sub 409 "${AUTH[@]}"
+  check "" DELETE /api/admin/pages/about-smoke-sub-2 200 "${AUTH[@]}"
   check "" DELETE /api/admin/pages/about-smoke-sub 200 "${AUTH[@]}"
 fi
 
