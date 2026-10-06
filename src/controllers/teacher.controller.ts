@@ -3,6 +3,7 @@ import * as teacherService from '../services/teacher.service';
 import { asyncHandler } from '../utils/asyncHandler';
 import { getParamAsString } from '../utils/params.util';
 import { AppError } from '../utils/AppError';
+import { parseFormDates } from '../utils/formDates';
 
 /**
  * Teacher Controller
@@ -63,11 +64,8 @@ export class TeacherController {
    * Create new teacher
    */
   create = asyncHandler(async (req: Request, res: Response) => {
-    // Convert date strings to Date objects if needed
-    const teacherData: any = { ...req.body };
-    if (req.body.hireDate) {
-      teacherData.hireDate = new Date(req.body.hireDate);
-    }
+    // Dates as Date objects; a hire date left blank arrives as "" (not given).
+    const teacherData: any = parseFormDates(req.body, { optional: ['hireDate'] });
 
     const teacher = await teacherService.createTeacher(teacherData);
 
@@ -85,11 +83,8 @@ export class TeacherController {
   update = asyncHandler(async (req: Request, res: Response) => {
     const id = getParamAsString(req.params.id);
 
-    // Convert date strings to Date objects if needed
-    const teacherData: any = { ...req.body };
-    if (req.body.hireDate) {
-      teacherData.hireDate = new Date(req.body.hireDate);
-    }
+    // Dates as Date objects; a hire date left blank arrives as "" (not given).
+    const teacherData: any = parseFormDates(req.body, { optional: ['hireDate'] });
 
     const teacher = await teacherService.updateTeacher(id, teacherData);
 

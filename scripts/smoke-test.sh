@@ -146,6 +146,14 @@ if [ "${SMOKE_WRITE:-0}" = "1" ]; then
   check "" DELETE /api/admin/pages/about-smoke-sub 409 "${AUTH[@]}"
   check "" DELETE /api/admin/pages/about-smoke-sub-2 200 "${AUTH[@]}"
   check "" DELETE /api/admin/pages/about-smoke-sub 200 "${AUTH[@]}"
+
+  echo "blank dates (SMOKE_WRITE=1)"
+  # The admin portal's date inputs send "" when left blank: that means "not
+  # given", not an invalid date (it used to fail with a bare "Validation failed").
+  check "" POST /api/admin/subscribers 201 "${AUTH[@]}" -H 'Content-Type: application/json' \
+    -d "{\"fullName\":\"Smoke Subscriber\",\"email\":\"smoke-$(date +%s)@example.com\",\"phoneNumber\":\"+92 300 0000000\",\"monthlyDonationAmount\":100,\"subscriberType\":\"GENERAL\",\"paymentType\":\"DONATION\",\"subscriptionStartDate\":\"\",\"subscriptionEndDate\":\"\"}"
+  SUBSCRIBER_ID=$(created_id)
+  check "" DELETE "/api/admin/subscribers/$SUBSCRIBER_ID" 200 "${AUTH[@]}"
 fi
 
 echo

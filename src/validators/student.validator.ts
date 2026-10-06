@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { dateString, optionalDateString } from './date.validator';
 
 /**
  * Student Request Validators
@@ -8,15 +9,6 @@ import { z } from 'zod';
 const idParam = z.object({
   id: z.string().uuid('Invalid student ID format'),
 });
-
-const dateString = z
-  .string()
-  .transform((val) => {
-    if (/^\d{4}-\d{2}-\d{2}$/.test(val)) {
-      return new Date(val + 'T00:00:00Z').toISOString();
-    }
-    return new Date(val).toISOString();
-  });
 
 const studentFields = {
   fullName: z.string().min(2, 'Full name must be at least 2 characters').trim(),
@@ -42,7 +34,7 @@ export const createStudentSchema = z.object({
     guardianEmail: studentFields.guardianEmail.optional(),
     schoolName: studentFields.schoolName,
     grade: studentFields.grade,
-    enrollmentDate: dateString.optional(),
+    enrollmentDate: optionalDateString,
     isActive: studentFields.isActive.optional().default(true),
   }),
 });
@@ -50,14 +42,14 @@ export const createStudentSchema = z.object({
 export const updateStudentSchema = z.object({
   body: z.object({
     fullName: studentFields.fullName.optional(),
-    dateOfBirth: dateString.optional(),
+    dateOfBirth: optionalDateString,
     gender: studentFields.gender.optional(),
     guardianName: studentFields.guardianName.optional(),
     guardianPhone: studentFields.guardianPhone.optional(),
     guardianEmail: studentFields.guardianEmail.optional(),
     schoolName: studentFields.schoolName.optional(),
     grade: studentFields.grade.optional(),
-    enrollmentDate: dateString.optional(),
+    enrollmentDate: optionalDateString,
     isActive: studentFields.isActive.optional(),
   }),
   params: idParam,
