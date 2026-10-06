@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { optionalDateString } from './date.validator';
 
 /**
  * Teacher Request Validators
@@ -8,15 +9,6 @@ import { z } from 'zod';
 const idParam = z.object({
   id: z.string().uuid('Invalid teacher ID format'),
 });
-
-const dateString = z
-  .string()
-  .transform((val) => {
-    if (/^\d{4}-\d{2}-\d{2}$/.test(val)) {
-      return new Date(val + 'T00:00:00Z').toISOString();
-    }
-    return new Date(val).toISOString();
-  });
 
 const teacherFields = {
   fullName: z.string().min(2, 'Full name must be at least 2 characters').trim(),
@@ -43,7 +35,7 @@ export const createTeacherSchema = z.object({
     subject: teacherFields.subject,
     qualification: teacherFields.qualification,
     experience: teacherFields.experience,
-    hireDate: dateString.optional(),
+    hireDate: optionalDateString,
     isActive: teacherFields.isActive.optional().default(true),
   }),
 });
@@ -56,7 +48,7 @@ export const updateTeacherSchema = z.object({
     subject: teacherFields.subject.optional(),
     qualification: teacherFields.qualification.optional(),
     experience: teacherFields.experience.optional(),
-    hireDate: dateString.optional(),
+    hireDate: optionalDateString,
     isActive: teacherFields.isActive.optional(),
   }),
   params: idParam,

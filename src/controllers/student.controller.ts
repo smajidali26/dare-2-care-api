@@ -3,6 +3,7 @@ import * as studentService from '../services/student.service';
 import { asyncHandler } from '../utils/asyncHandler';
 import { getParamAsString } from '../utils/params.util';
 import { AppError } from '../utils/AppError';
+import { parseFormDates } from '../utils/formDates';
 
 /**
  * Student Controller
@@ -65,14 +66,10 @@ export class StudentController {
    * Create new student
    */
   create = asyncHandler(async (req: Request, res: Response) => {
-    // Convert date strings to Date objects if needed
-    const studentData: any = { ...req.body };
-    if (req.body.dateOfBirth) {
-      studentData.dateOfBirth = new Date(req.body.dateOfBirth);
-    }
-    if (req.body.enrollmentDate) {
-      studentData.enrollmentDate = new Date(req.body.enrollmentDate);
-    }
+    // Dates as Date objects; date inputs left blank arrive as "" (not given).
+    const studentData: any = parseFormDates(req.body, {
+      optional: ['dateOfBirth', 'enrollmentDate'],
+    });
 
     const student = await studentService.createStudent(studentData);
 
@@ -90,14 +87,10 @@ export class StudentController {
   update = asyncHandler(async (req: Request, res: Response) => {
     const id = getParamAsString(req.params.id);
 
-    // Convert date strings to Date objects if needed
-    const studentData: any = { ...req.body };
-    if (req.body.dateOfBirth) {
-      studentData.dateOfBirth = new Date(req.body.dateOfBirth);
-    }
-    if (req.body.enrollmentDate) {
-      studentData.enrollmentDate = new Date(req.body.enrollmentDate);
-    }
+    // Dates as Date objects; date inputs left blank arrive as "" (not given).
+    const studentData: any = parseFormDates(req.body, {
+      optional: ['dateOfBirth', 'enrollmentDate'],
+    });
 
     const student = await studentService.updateStudent(id, studentData);
 

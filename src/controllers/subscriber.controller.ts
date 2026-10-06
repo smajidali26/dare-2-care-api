@@ -3,6 +3,7 @@ import * as subscriberService from '../services/subscriber.service';
 import { asyncHandler } from '../utils/asyncHandler';
 import { getParamAsString } from '../utils/params.util';
 import { AppError } from '../utils/AppError';
+import { parseFormDates } from '../utils/formDates';
 
 /**
  * Subscriber Controller
@@ -75,14 +76,12 @@ export class SubscriberController {
    * Create new subscriber
    */
   create = asyncHandler(async (req: Request, res: Response) => {
-    // Convert date strings to Date objects if needed
-    const subscriberData: any = { ...req.body };
-    if (req.body.subscriptionStartDate) {
-      subscriberData.subscriptionStartDate = new Date(req.body.subscriptionStartDate);
-    }
-    if (req.body.subscriptionEndDate) {
-      subscriberData.subscriptionEndDate = new Date(req.body.subscriptionEndDate);
-    }
+    // Dates as Date objects; date inputs left blank arrive as "", and a blank
+    // end date clears it.
+    const subscriberData: any = parseFormDates(req.body, {
+      optional: ['subscriptionStartDate'],
+      clearable: ['subscriptionEndDate'],
+    });
 
     const subscriber = await subscriberService.createSubscriber(subscriberData);
 
@@ -100,14 +99,12 @@ export class SubscriberController {
   update = asyncHandler(async (req: Request, res: Response) => {
     const id = getParamAsString(req.params.id);
 
-    // Convert date strings to Date objects if needed
-    const subscriberData: any = { ...req.body };
-    if (req.body.subscriptionStartDate) {
-      subscriberData.subscriptionStartDate = new Date(req.body.subscriptionStartDate);
-    }
-    if (req.body.subscriptionEndDate) {
-      subscriberData.subscriptionEndDate = new Date(req.body.subscriptionEndDate);
-    }
+    // Dates as Date objects; date inputs left blank arrive as "", and a blank
+    // end date clears it.
+    const subscriberData: any = parseFormDates(req.body, {
+      optional: ['subscriptionStartDate'],
+      clearable: ['subscriptionEndDate'],
+    });
 
     const subscriber = await subscriberService.updateSubscriber(id, subscriberData);
 

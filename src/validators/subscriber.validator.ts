@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { clearableDateString, optionalDateString } from './date.validator';
 
 /**
  * Subscriber Request Validators
@@ -8,15 +9,6 @@ import { z } from 'zod';
 const idParam = z.object({
   id: z.string().uuid('Invalid subscriber ID format'),
 });
-
-const dateString = z
-  .string()
-  .transform((val) => {
-    if (/^\d{4}-\d{2}-\d{2}$/.test(val)) {
-      return new Date(val + 'T00:00:00Z').toISOString();
-    }
-    return new Date(val).toISOString();
-  });
 
 const subscriberFields = {
   fullName: z.string().min(2, 'Full name must be at least 2 characters').trim(),
@@ -56,8 +48,8 @@ export const createSubscriberSchema = z.object({
     emailNotifications: subscriberFields.emailNotifications.optional().default(true),
     smsNotifications: subscriberFields.smsNotifications.optional().default(true),
     isActive: subscriberFields.isActive.optional().default(true),
-    subscriptionStartDate: dateString.optional(),
-    subscriptionEndDate: dateString.optional().nullable(),
+    subscriptionStartDate: optionalDateString,
+    subscriptionEndDate: clearableDateString,
     subscriberType: subscriberFields.subscriberType,
     paymentType: subscriberFields.paymentType,
     profileImageUrl: subscriberFields.profileImageUrl.optional(),
@@ -78,8 +70,8 @@ export const updateSubscriberSchema = z.object({
     emailNotifications: subscriberFields.emailNotifications.optional(),
     smsNotifications: subscriberFields.smsNotifications.optional(),
     isActive: subscriberFields.isActive.optional(),
-    subscriptionStartDate: dateString.optional(),
-    subscriptionEndDate: dateString.optional().nullable(),
+    subscriptionStartDate: optionalDateString,
+    subscriptionEndDate: clearableDateString,
     subscriberType: subscriberFields.subscriberType.optional(),
     paymentType: subscriberFields.paymentType.optional(),
     profileImageUrl: subscriberFields.profileImageUrl.optional(),
