@@ -120,6 +120,30 @@ if [ "${SMOKE_WRITE:-0}" = "1" ]; then
     fail=$((fail + 1))
   fi
 
+  echo "slide captions (SMOKE_WRITE=1)"
+  check "" POST /api/admin/images 201 "${AUTH[@]}" -H 'Content-Type: application/json' \
+    -d '{"title":"Smoke slide","altText":"Smoke slide","storageUrl":"https://example.com/smoke-slide.jpg","fileName":"smoke-slide.jpg","fileSize":1000,"isSliderImage":true,"caption":"  Smoke caption  "}'
+  IMAGE_ID=$(created_id)
+  : > /tmp/smoke-body
+  code=$(curl -s -o /tmp/smoke-body -w '%{http_code}' --max-time 20 "$BASE_URL/api/public/images/slider")
+  if [ "$code" = "200" ] && node -e "const i=JSON.parse(require('fs').readFileSync('/tmp/smoke-body','utf8')).data.find(i=>i.id==='$IMAGE_ID');process.exit(i&&i.caption==='Smoke caption'?0:1)"; then
+    printf '  ok   %-44s serves the slide with its caption\n' "GET /api/public/images/slider"
+    pass=$((pass + 1))
+  else
+    printf '  FAIL %-44s got %s; body: %s\n' "GET /api/public/images/slider" "$code" "$(head -c 200 /tmp/smoke-body)"
+    fail=$((fail + 1))
+  fi
+  # A blank caption removes it.
+  check "" PUT "/api/admin/images/$IMAGE_ID" 200 "${AUTH[@]}" -H 'Content-Type: application/json' -d '{"caption":"   "}'
+  if node -e "process.exit(JSON.parse(require('fs').readFileSync('/tmp/smoke-body','utf8')).data.caption===null?0:1)"; then
+    printf '  ok   %-44s blank caption stored as null\n' "PUT /api/admin/images/:id"
+    pass=$((pass + 1))
+  else
+    printf '  FAIL %-44s blank caption not cleared; body: %s\n' "PUT /api/admin/images/:id" "$(head -c 200 /tmp/smoke-body)"
+    fail=$((fail + 1))
+  fi
+  check "" DELETE "/api/admin/images/$IMAGE_ID" 200 "${AUTH[@]}"
+
   echo "sub pages and the menu (SMOKE_WRITE=1)"
   ABOUT_ID=$(curl -s --max-time 20 "$BASE_URL/api/admin/pages" "${AUTH[@]}" | node -e \
     "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{try{process.stdout.write((JSON.parse(d).data.find(p=>p.slug==='about-us')||{}).id||'')}catch(e){}})")

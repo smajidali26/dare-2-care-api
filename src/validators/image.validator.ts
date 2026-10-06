@@ -22,6 +22,12 @@ export const createImageSchema = z.object({
       .string()
       .max(1000, 'Description must be less than 1000 characters')
       .optional(),
+    // Text over the slide on the homepage; blank means no caption.
+    caption: z
+      .string()
+      .max(150, 'Caption must be 150 characters or less')
+      .nullable()
+      .optional(),
     storageUrl: z.string().url('Invalid storage URL'),
     fileName: z.string().min(1, 'File name is required'),
     fileSize: z
@@ -52,6 +58,12 @@ export const updateImageSchema = z.object({
     description: z
       .string()
       .max(1000, 'Description must be less than 1000 characters')
+      .optional(),
+    // Text over the slide on the homepage; blank means no caption.
+    caption: z
+      .string()
+      .max(150, 'Caption must be 150 characters or less')
+      .nullable()
       .optional(),
     // The admin "Edit image" form has a "Show in homepage slider" checkbox, so
     // this field has to be accepted here — without it Zod stripped the value and
