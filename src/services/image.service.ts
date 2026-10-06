@@ -2,6 +2,10 @@ import { Image, Prisma } from '@prisma/client';
 import { ImageRepository } from '../repositories/image.repository';
 import { AppError } from '../utils/AppError';
 
+/** A slide caption, trimmed; blank means no caption (null). */
+const captionText = (value: string | null | undefined): string | null | undefined =>
+  value === undefined ? undefined : value?.trim() || null;
+
 /**
  * Image Service
  * Business logic for image library management
@@ -60,6 +64,7 @@ export class ImageService {
     title: string;
     altText: string;
     description?: string;
+    caption?: string | null;
     storageUrl: string;
     fileName: string;
     fileSize: number;
@@ -71,6 +76,7 @@ export class ImageService {
       title: data.title,
       altText: data.altText,
       description: data.description,
+      caption: captionText(data.caption) ?? null,
       storageUrl: data.storageUrl,
       fileName: data.fileName,
       fileSize: data.fileSize,
@@ -97,6 +103,7 @@ export class ImageService {
       title?: string;
       altText?: string;
       description?: string;
+      caption?: string | null;
       isSliderImage?: boolean;
       isPublished?: boolean;
       displayOrder?: number;
@@ -110,6 +117,7 @@ export class ImageService {
     if (data.title !== undefined) updateData.title = data.title;
     if (data.altText !== undefined) updateData.altText = data.altText;
     if (data.description !== undefined) updateData.description = data.description;
+    if (data.caption !== undefined) updateData.caption = captionText(data.caption);
     if (data.isPublished !== undefined) updateData.isPublished = data.isPublished;
     if (data.displayOrder !== undefined) updateData.displayOrder = data.displayOrder;
 

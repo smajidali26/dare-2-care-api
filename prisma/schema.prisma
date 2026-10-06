@@ -125,6 +125,8 @@ model Image {
   title         String
   altText       String   @map("alt_text")
   description   String?
+  /// Shown over the slide on the homepage, for an image in the slider.
+  caption       String?  @db.VarChar(150)
   storageUrl    String   @map("storage_url")
   fileName      String   @map("file_name")
   fileSize      Int      @map("file_size")
