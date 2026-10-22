@@ -9,10 +9,13 @@ export interface PageMenuFields {
   menuOrder?: number;
 }
 
-/** What the website needs to build its menu: no content. */
+/**
+ * What the website needs to build its menu and its sitemap: no content.
+ * updatedAt is the sitemap's "last modified" date for the page.
+ */
 export type MenuPage = Pick<
   Page,
-  'id' | 'slug' | 'title' | 'parentId' | 'menuLabel' | 'menuHeading' | 'menuOrder'
+  'id' | 'slug' | 'title' | 'parentId' | 'menuLabel' | 'menuHeading' | 'menuOrder' | 'updatedAt'
 >;
 
 /** A page's place in the page tree. */
@@ -43,6 +46,7 @@ export class PageRepository {
         menuLabel: true,
         menuHeading: true,
         menuOrder: true,
+        updatedAt: true,
       },
       orderBy: [{ menuOrder: 'asc' }, { title: 'asc' }],
     });

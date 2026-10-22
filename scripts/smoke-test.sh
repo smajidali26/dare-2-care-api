@@ -56,6 +56,14 @@ check "" GET /api/public/pages/about-us 200
 check "" GET /api/public/pages/history 200
 check "" GET /api/public/homepage/what-we-do 200
 check "" GET /api/public/pages 200
+# The website's sitemap uses each page's updatedAt as its "last modified" date.
+if node -e "const d=JSON.parse(require('fs').readFileSync('/tmp/smoke-body','utf8')).data;process.exit(d.length>0&&d.every(p=>!Number.isNaN(Date.parse(p.updatedAt)))?0:1)"; then
+  printf '  ok   %-44s every page has an updatedAt date\n' "GET /api/public/pages"
+  pass=$((pass + 1))
+else
+  printf '  FAIL %-44s a page has no valid updatedAt; body: %s\n' "GET /api/public/pages" "$(head -c 200 /tmp/smoke-body)"
+  fail=$((fail + 1))
+fi
 
 echo "routing and error handling"
 # Guards the outage where a bad rewrite handed Express the wrong path and every
